@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QLineEdit, QLabel, QVBoxLayout, QWidget, QDialog, QTableWidget, QHBoxLayout, QPushButton, QGraphicsDropShadowEffect, QComboBox, QTableWidgetItem, QHeaderView, QMessageBox, QFormLayout, QSizePolicy
-from PyQt6.QtCore import Qt, QSize, QDate
+from PyQt6.QtCore import Qt, QSize, QDate, QTimer # Import QTimer for debouncing
 from PyQt6.QtGui import QColor, QIcon, QPixmap, QImage
 from datetime import datetime, timedelta
 from database import *
@@ -150,7 +150,6 @@ class Add_page(QWidget):
         self.save_btn = QPushButton("Saqlash")
         self.date_line = FocusShadowLineEdit(True, self.save_btn)
         self.save_btn.clicked.connect(self.save_to_database)
-        # self.save_btn.clicked.connect(self.update_table) # Update table after saving is handled by the dialog
         
         self.name_lbl = create_label("Ism kiriting:")
         self.contact_lbl = create_label("Telefon raqam kiriting (99-123-4567):")
@@ -161,7 +160,8 @@ class Add_page(QWidget):
         self.table = QTableWidget()
         self.table.horizontalHeader().setDefaultSectionSize(50)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch) # Make columns stretch
-        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch) # Make rows stretch
+        # Changed vertical header resize mode to ResizeToContents for better height management
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents) 
         self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding) # Allow table to expand
 
         self.shadow_effect = QGraphicsDropShadowEffect()
@@ -170,23 +170,27 @@ class Add_page(QWidget):
         self.shadow_effect.setColor(QColor(128, 128, 128))
         
         self.search_line.setPlaceholderText("Qidiruvga ism yoki telefon raqam kiriting...")
-        # self.search_line.setFixedSize(405, 40) # Removed fixed size
         self.search_line.setFixedHeight(40) # Keep fixed height for line edits
-        self.search_line.textChanged.connect(self.update_table)
+        
+        # Debounce the textChanged signal for search_line
+        self.search_timer = QTimer(self)
+        self.search_timer.setSingleShot(True)
+        self.search_timer.setInterval(300) # 300ms delay
+        self.search_line.textChanged.connect(self.search_timer.start)
+        self.search_timer.timeout.connect(self.update_table)
+
         self.search_layout = QHBoxLayout()
         self.search_layout.addStretch() # Center the search line
         self.search_layout.addWidget(self.search_line)
         self.search_layout.addStretch() # Center the search line
 
         self.name_line.setPlaceholderText("Ism yarating...")
-        # self.name_line.setFixedSize(350, 40) # Removed fixed size
         self.name_line.setFixedHeight(40)
         name_layout = QVBoxLayout()
         name_layout.addWidget(self.name_lbl)
         name_layout.addWidget(self.name_line)
         name_layout.setSpacing(3)
 
-        # self.contact_line.setFixedSize(350, 40) # Removed fixed size
         self.contact_line.setFixedHeight(40)
         self.contact_line.setInputMask("00-000-0000;_")
 
@@ -201,7 +205,6 @@ class Add_page(QWidget):
         first_row.setSpacing(50)
 
         self.description_line.setPlaceholderText("Izoh qoldiring...")
-        # self.description_line.setFixedSize(750, 50) # Removed fixed size
         self.description_line.setFixedHeight(50)
         self.description_layout = QVBoxLayout()
         self.description_layout.addWidget(self.description_lbl)
@@ -210,14 +213,12 @@ class Add_page(QWidget):
         self.description_layout.setSpacing(5)
 
         self.amount_line.setPlaceholderText("Summani kiriting: ")
-        # self.amount_line.setFixedSize(250, 40) # Removed fixed size
         self.amount_line.setFixedHeight(40)
         self.amount_layout = QVBoxLayout()
         self.amount_layout.addWidget(self.amount_lbl)
         self.amount_layout.addWidget(self.amount_line)
         self.amount_layout.setSpacing(3)
 
-        # self.date_line.setFixedSize(200, 40) # Removed fixed size
         self.date_line.setFixedHeight(40)
         self.date_line.setInputMask("00/00/0000;_")
         self.date_layout = QVBoxLayout()
@@ -225,7 +226,6 @@ class Add_page(QWidget):
         self.date_layout.addWidget(self.date_line)
         self.date_layout.setSpacing(3)
 
-        # self.save_btn.setFixedSize(200, 40) # Removed fixed size
         self.save_btn.setMinimumSize(150, 40) # Set minimum size for button
         self.save_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.save_btn.setStyleSheet("font-size: 18px; border: 0px; border-radius: 12px; background: #525CEB; color: #F8EDFF")
@@ -241,7 +241,6 @@ class Add_page(QWidget):
 
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(['Ism', 'Telefon', 'Summa', 'Copy'])
-        # self.table.setFixedSize(800, 360) # Removed fixed size
         self.table.setStyleSheet("""
         QTableWidget {
             font-size: 16px;
@@ -256,10 +255,6 @@ class Add_page(QWidget):
             }
         """)
 
-        # self.table.setColumnWidth(0, 280) # Removed fixed column widths, let stretch handle it
-        # self.table.setColumnWidth(1, 170)
-        # self.table.setColumnWidth(2, 200)
-        # self.table.setColumnWidth(3, 90)
         self.update_table()
 
         self.main_layout.addLayout(self.search_layout)
@@ -270,7 +265,6 @@ class Add_page(QWidget):
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter) # Align content to center horizontally
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop) # Align content to top vertically
         self.main_layout.setSpacing(10)
-        # self.setLayout(self.main_layout) # Already set in constructor
 
     def show_message(self, name, amount):
         dialog = CustomDialog(name, amount)
@@ -278,10 +272,8 @@ class Add_page(QWidget):
 
         if result == QDialog.DialogCode.Accepted:
             selected_date = dialog.get_date()
-            # QMessageBox.information(None, "Date", f"Confirmed Date: {selected_date}") # Removed redundant message box
             return selected_date
         else:
-            # QMessageBox.information(None, "Cancelled", "The operation was cancelled.") # Removed redundant message box
             return None
 
     def update_table(self):
@@ -293,10 +285,11 @@ class Add_page(QWidget):
             self.search_line.setText(search_text)
             self.search_line.blockSignals(False)
 
+        self.table.setUpdatesEnabled(False) # Disable updates for faster population
         data = core.find_customers(search_text)
         self.table.setRowCount(len(data))
         for i,val in enumerate(data):
-            self.table.setRowHeight(i, 40)
+            self.table.setRowHeight(i, 40) # Keep a default row height, but ResizeToContents will adjust
             self.table.setItem(i, 0, QTableWidgetItem(val[0]))
             self.table.setItem(i, 1, QTableWidgetItem(val[1][:2] + "-" + val[1][2:5] + "-" + val[1][5:]))
             reversed_string = str(val[2])[::-1]
@@ -308,6 +301,7 @@ class Add_page(QWidget):
             copy_button.setStyleSheet("font-size: 14px; background-color: #525CEB; color: #F8EDFF; border-radius: 5px;")
             copy_button.clicked.connect(lambda checked, row=i: self.copy_row_data(row))
             self.table.setCellWidget(i, 3, copy_button)
+        self.table.setUpdatesEnabled(True) # Re-enable updates
 
     def save_btn_press(self):
         self.shadow_effect.setOffset(2, 2)
@@ -317,7 +311,6 @@ class Add_page(QWidget):
 
     def copy_row_data(self, row):
         data = []
-        # core = Database() # Not needed here
         self.amount_line.clear()
         self.date_line.clear()
         for col in range(3):
@@ -387,7 +380,7 @@ class Add_page(QWidget):
             else:
                 QMessageBox.information(self, "Message", "Amal bekor qilindi")
         else:
-            QMessageBox.information(self, "Error", "Iltimos, barcha maydonlarni to'ldiring. ❌") # Added a message for incomplete fields
+            QMessageBox.information(self, "Error", "Iltimos, barcha maydonlarni to'ldiring. ❌")
 
             
 class List_people(QWidget):
@@ -400,7 +393,8 @@ class List_people(QWidget):
         self.table = QTableWidget()
         self.table.horizontalHeader().setDefaultSectionSize(50)
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch) # Make columns stretch
-        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch) # Make rows stretch
+        # Changed vertical header resize mode to ResizeToContents for better height management
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents) 
         self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding) # Allow table to expand
 
 
@@ -410,9 +404,15 @@ class List_people(QWidget):
         self.shadow_effect.setColor(QColor(128, 128, 128))
 
         self.search_line.setPlaceholderText("Qidiruvga ism yoki telefon raqam kiriting...")
-        # self.search_line.setFixedSize(405, 40) # Removed fixed size
         self.search_line.setFixedHeight(40)
-        self.search_line.textChanged.connect(self.update_table)
+        
+        # Debounce the textChanged signal for search_line
+        self.search_timer = QTimer(self)
+        self.search_timer.setSingleShot(True)
+        self.search_timer.setInterval(300) # 300ms delay
+        self.search_line.textChanged.connect(self.search_timer.start)
+        self.search_timer.timeout.connect(self.update_table)
+
         self.search_layout = QHBoxLayout()
         self.search_layout.addStretch()
         self.search_layout.addWidget(self.search_line)
@@ -420,7 +420,6 @@ class List_people(QWidget):
 
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(['Ism', 'Telefon', 'Summa', "Tarix", "To'lov"])
-        # self.table.setFixedSize(800, 600) # Removed fixed size
         self.table.setStyleSheet("""
         QTableWidget {
             font-size: 16px;
@@ -435,11 +434,6 @@ class List_people(QWidget):
             }
         """)
 
-        # self.table.setColumnWidth(0, 190) # Removed fixed column widths
-        # self.table.setColumnWidth(1, 170)
-        # self.table.setColumnWidth(2, 200)
-        # self.table.setColumnWidth(3, 90)
-        # self.table.setColumnWidth(4, 90)
         self.update_table()
 
         self.main_layout.addLayout(self.search_layout)
@@ -447,7 +441,6 @@ class List_people(QWidget):
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.main_layout.setSpacing(10)
-        # self.setLayout(self.main_layout) # Already set in constructor
 
     def update_table(self):
         core = Database()
@@ -458,10 +451,11 @@ class List_people(QWidget):
             self.search_line.setText(search_text)
             self.search_line.blockSignals(False)
 
+        self.table.setUpdatesEnabled(False) # Disable updates for faster population
         data = core.find_customers(search_text)
         self.table.setRowCount(len(data))
         for i,val in enumerate(data):
-            self.table.setRowHeight(i, 40)
+            self.table.setRowHeight(i, 40) # Keep a default row height, but ResizeToContents will adjust
             self.table.setItem(i, 0, QTableWidgetItem(val[0]))
             self.table.setItem(i, 1, QTableWidgetItem(val[1][:2] + "-" + val[1][2:5] + "-" + val[1][5:]))
             reversed_string = str(val[2])[::-1]
@@ -477,6 +471,7 @@ class List_people(QWidget):
             pay_button.clicked.connect(lambda checked, x=val[3]: self.open_payment_page(x))
             self.table.setCellWidget(i, 3, history_button)
             self.table.setCellWidget(i, 4, pay_button)
+        self.table.setUpdatesEnabled(True) # Re-enable updates
 
     def switch_page(self, customer_id):
         history_widget = self.stacked_widget.widget(4)
@@ -496,7 +491,6 @@ class payment(QWidget):
         super().__init__()
         self.main_window = main_window
         self.customer_id = customer_id
-        # self.setFixedSize(400, 300) # Removed fixed size
         self.setMinimumSize(400, 300) # Set minimum size for payment window
         self.setWindowTitle("To'lov oynasi")
         self.setStyleSheet("font-size: 18px")
@@ -514,14 +508,12 @@ class payment(QWidget):
 
         self.comment_line = FocusShadowLineEdit()
         self.comment_line.setPlaceholderText("Izoh qoldiring...")
-        # self.comment_line.setFixedSize(380, 40) # Removed fixed size
         self.comment_line.setFixedHeight(40)
 
         self.amount_lbl = QLabel("Summani kiriting: ")
         self.amount_lbl.setStyleSheet("font-size: 20px")
         self.amount_line = FormattedLineEdit()
         self.amount_line.setPlaceholderText("Summani kiriting: ")
-        # self.amount_line.setFixedSize(200, 40) # Removed fixed size
         self.amount_line.setFixedHeight(40)
         self.amount_layout = QHBoxLayout()
         self.amount_layout.addWidget(self.amount_lbl)
@@ -534,7 +526,6 @@ class payment(QWidget):
         self.shadow_effect.setColor(QColor(128, 128, 128))
 
         self.save_btn = QPushButton("To'lash")
-        # self.save_btn.setFixedSize(200, 40) # Removed fixed size
         self.save_btn.setMinimumSize(150, 40)
         self.save_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.save_btn.setStyleSheet("font-size: 18px; border: 0px; border-radius: 12px; background: #525CEB; color: #F8EDFF")
@@ -550,8 +541,6 @@ class payment(QWidget):
         self.main_layout.addLayout(self.amount_layout)
         self.main_layout.addStretch(1) # Add stretch
         self.main_layout.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignCenter)
-
-        # self.setLayout(self.main_layout) # Already set in constructor
 
     def save_to_database(self):
         amount = self.amount_line.text()
@@ -606,7 +595,6 @@ class History(QWidget):
         self.back_btn.clicked.connect(self.back_to_list)
         self.back_btn.setIcon(QIcon('back_btn.png'))
         self.back_btn.setIconSize(QSize(25, 25))
-        # self.back_btn.setFixedSize(50, 50) # Removed fixed size
         self.back_btn.setMinimumSize(50, 50)
         self.back_btn.setMaximumSize(50, 50) # Keep button square
         self.back_btn.setStyleSheet("""
@@ -634,9 +622,9 @@ class History(QWidget):
         self.debt_table.horizontalHeader().setDefaultSectionSize(50)
         self.debt_table.setColumnCount(2)
         self.debt_table.setHorizontalHeaderLabels(['Summa', 'Olingan vaqt'])
-        # self.debt_table.setFixedSize(375, 450) # Removed fixed size
         self.debt_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.debt_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        # Changed vertical header resize mode to ResizeToContents for better height management
+        self.debt_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.debt_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.debt_table.setStyleSheet("""
         QTableWidget {
@@ -652,17 +640,15 @@ class History(QWidget):
                 color: #C7253E
             }
         """)
-        # self.debt_table.setColumnWidth(0,165) # Removed fixed column widths
-        # self.debt_table.setColumnWidth(1,210)
         self.debt_table.cellClicked.connect(self.show_overflow_text1)
 
         self.payed_table = QTableWidget()
         self.payed_table.horizontalHeader().setDefaultSectionSize(50)
         self.payed_table.setColumnCount(2)
         self.payed_table.setHorizontalHeaderLabels(['Summa', 'Olingan vaqt'])
-        # self.payed_table.setFixedSize(375, 450) # Removed fixed size
         self.payed_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.payed_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        # Changed vertical header resize mode to ResizeToContents for better height management
+        self.payed_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         self.payed_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.payed_table.setStyleSheet("""
         QTableWidget {
@@ -678,8 +664,6 @@ class History(QWidget):
                 color: #00712D
             }
         """)
-        # self.payed_table.setColumnWidth(0,165) # Removed fixed column widths
-        # self.payed_table.setColumnWidth(1,210)
         self.payed_table.cellClicked.connect(self.show_overflow_text2)
 
         self.main_layout = QVBoxLayout()
@@ -695,17 +679,14 @@ class History(QWidget):
         shadow.setColor(QColor(128, 128, 128))
 
         self.name_lbl.setStyleSheet("font-size: 25px; color: #333333; font-weight: bold; font-family: 'Roboto';")
-        # self.name_lbl.setFixedHeight(70) # Removed fixed height
         self.name_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
 
 
         self.description_lbl.setStyleSheet("font-size: 18px;; color: #333333; font-weight: bold; font-family: 'Roboto';")
-        # self.description_lbl.setFixedHeight(40) # Removed fixed height
         self.description_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
 
 
         self.contact_lbl.setStyleSheet("font-size: 18px;color: #333333; font-weight: bold; font-family: 'Roboto';")
-        # self.contact_lbl.setFixedHeight(40) # Removed fixed height
         self.contact_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
 
 
@@ -713,15 +694,11 @@ class History(QWidget):
         self.overall_lbl.setStyleSheet("font-size: 18px; color: #333333; font-weight: bold; font-family: 'Roboto'; background: #FEFAE0; padding-left: 3px")        
         self.payed_lbl.setStyleSheet("font-size: 18px; color: #00712D; font-weight: bold; font-family: 'Roboto'; background: #FEFAE0; padding-left: 3px")
 
-        # self.debt_lbl.setFixedSize(250, 50) # Removed fixed size
-        # self.overall_lbl.setFixedSize(250, 50) # Removed fixed size
-        # self.payed_lbl.setFixedSize(250, 50) # Removed fixed size
-        self.debt_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.overall_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.payed_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        self.debt_lbl.setFixedHeight(50)
-        self.overall_lbl.setFixedHeight(50)
-        self.payed_lbl.setFixedHeight(50)
+        # Removed fixed sizes and fixed heights for these labels.
+        # Set size policy to expanding in both directions so they can fill space.
+        self.debt_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.overall_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        self.payed_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
 
     def show_overflow_text1(self, row, column):
@@ -776,11 +753,10 @@ class History(QWidget):
         self.overall_lbl.setText(formatted_total)
         self.payed_lbl.setText(formatted_payed)
 
+        self.debt_table.setUpdatesEnabled(False) # Disable updates for faster population
         self.debt_table.setRowCount(len(information['debts']))
-        self.payed_table.setRowCount(len(information['payments']))
-
         for i, val in enumerate(information['debts']):
-            self.debt_table.setRowHeight(i, 40)
+            self.debt_table.setRowHeight(i, 40) # Keep a default row height, but ResizeToContents will adjust
             reversed_string = str(val[0])[::-1]
             spaced_string = ' '.join(reversed_string[i:i+3] for i in range(0, len(reversed_string), 3))
             formatted_string = spaced_string[::-1]
@@ -788,9 +764,12 @@ class History(QWidget):
             datetime_obj = val[1]
             formatted_date = datetime_obj.strftime('%d/%m/%Y %H:%M:%S')
             self.debt_table.setItem(i, 1, QTableWidgetItem(formatted_date))
+        self.debt_table.setUpdatesEnabled(True) # Re-enable updates
 
+        self.payed_table.setUpdatesEnabled(False) # Disable updates for faster population
+        self.payed_table.setRowCount(len(information['payments']))
         for i, val in enumerate(information['payments']):
-            self.payed_table.setRowHeight(i, 40)
+            self.payed_table.setRowHeight(i, 40) # Keep a default row height, but ResizeToContents will adjust
             reversed_string = str(val[0])[::-1]
             spaced_string = ' '.join(reversed_string[i:i+3] for i in range(0, len(reversed_string), 3))
             formatted_string = spaced_string[::-1]
@@ -798,39 +777,39 @@ class History(QWidget):
             datetime_obj = val[1]
             formatted_date = datetime_obj.strftime('%d/%m/%Y %H:%M:%S')
             self.payed_table.setItem(i, 1, QTableWidgetItem(formatted_date))
+        self.payed_table.setUpdatesEnabled(True) # Re-enable updates
+
 
     def layouts(self):
+        # info_layout: back button and customer description
         self.info_layout.addWidget(self.back_btn)
-        self.info_layout.addStretch(1) # Add stretch to push back button to left
-        
+        self.info_layout.addLayout(self.description_layout, 1) # description_layout takes remaining horizontal space
+
+        # description_layout: customer name, description, contact
         self.description_layout.addWidget(self.name_lbl)
         self.description_layout.addWidget(self.description_lbl)
         self.description_layout.addWidget(self.contact_lbl)
-        self.description_layout.addStretch(1) # Add stretch to push labels to top
+        self.description_layout.addStretch(1) # Push labels to top within their allocated space
+        self.description_layout.setSpacing(0) # Keep existing spacing
 
+        # money_layout: debt, overall, payed labels
+        self.money_layout.addWidget(self.debt_lbl, 1) # Give stretch to each label
+        self.money_layout.addWidget(self.overall_lbl, 1)
+        self.money_layout.addWidget(self.payed_lbl, 1)
+        self.money_layout.setSpacing(0) # Keep existing spacing
 
-        self.info_layout.addLayout(self.description_layout, 1) # Add stretch factor
+        # table_layout: debt table and payed table
+        self.table_layout.addWidget(self.debt_table, 1) # Give stretch to each table
+        self.table_layout.addWidget(self.payed_table, 1)
+        self.table_layout.setSpacing(10) # Keep existing spacing
 
-        self.money_layout.addWidget(self.debt_lbl)
-        self.money_layout.addWidget(self.overall_lbl)
-        self.money_layout.addWidget(self.payed_lbl)
-        self.money_layout.setSpacing(0)
-        self.money_layout.addStretch(1) # Add stretch to fill remaining space
-
-
-        self.table_layout.addWidget(self.debt_table, 1) # Add stretch factor
-        self.table_layout.addWidget(self.payed_table, 1) # Add stretch factor
-        self.table_layout.setSpacing(10)
-
-        self.description_layout.setSpacing(0)
-        self.main_layout.addLayout(self.info_layout)
-        self.main_layout.addLayout(self.money_layout)
-        self.main_layout.addLayout(self.table_layout, 1) # Add stretch factor to table layout
-        self.main_layout.addStretch(1) # Add stretch to push content to top
+        # main_layout: arranges info, money, and table layouts vertically
+        self.main_layout.addLayout(self.info_layout) # No stretch, takes minimal height
+        self.main_layout.addLayout(self.money_layout) # No stretch, takes minimal height
+        self.main_layout.addLayout(self.table_layout, 1) # Tables take most of the remaining vertical space
 
 
     def back_to_list(self):
-        # No need to create a new List_people instance, just update the existing one
         list_people_widget = self.stacked_widget.widget(1)
         list_people_widget.update_table()
         self.stacked_widget.setCurrentIndex(1)

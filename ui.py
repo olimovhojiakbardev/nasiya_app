@@ -12,7 +12,6 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1000, 700)  # Set minimum size for the main window
 
         self.main_layout = QHBoxLayout()
-        # self.main_layout.setAlignment(Qt.AlignmentFlag.AlignLeft) # Removed as stretch will handle alignment
 
         self.side_menu = QVBoxLayout()
         self.side_menu.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -20,7 +19,6 @@ class MainWindow(QMainWindow):
         self.menu_widget = QWidget()
         self.menu_widget.setLayout(self.side_menu)
         self.menu_widget.setStyleSheet("background-color: #F0EBE3; border: 0px; border-radius: 20px;")
-        # self.menu_widget.setFixedSize(200, 680) # Changed to setMinimumWidth
         self.menu_widget.setMinimumWidth(200) # Minimum width, flexible height
         self.menu_widget.setMaximumWidth(250) # Optional: Set a maximum width for the side menu
         self.menu_widget.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
@@ -38,9 +36,6 @@ class MainWindow(QMainWindow):
         self.images = ['add.png', 'view.png', 'stat.png', 'report.png']
         self.image = ['addwhite.png', 'viewhite.png', 'statwhite.png', 'reportwhite.png']
         
-        # Removed redundant image saving operations. These should be handled during deployment
-        # or as part of a resource compilation, not at runtime repeatedly.
-
         for inx, button_name in enumerate(self.menu_buttons):
             btn = QPushButton(button_name)
             btn.setIcon(QIcon(self.images[inx]))
@@ -64,7 +59,7 @@ QPushButton:hover {
 """)
             self.menu_buttonss.append(btn) 
         
-        self.side_menu.addStretch() # Added stretch to push buttons to top
+        self.side_menu.addStretch()
 
         self.content_area = QStackedWidget()
         self.content_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -84,47 +79,52 @@ QPushButton:hover {
 
 
         self.main_layout.addWidget(self.menu_widget)
-        self.main_layout.addWidget(self.content_area, 1) # Add stretch factor to content_area
+        self.main_layout.addWidget(self.content_area, 1)
         container = QWidget()
         container.setLayout(self.main_layout)
         self.setCentralWidget(container)
 
     def switch_page(self, index):
-        self.content_area.setCurrentIndex(index)
-        for inx, btn in enumerate(self.menu_buttonss):
-            btn.setStyleSheet("""QPushButton {
-                background-color: #F0EBE3;
+        # Only update the table if switching to a different page
+        if self.content_area.currentIndex() != index:
+            self.content_area.setCurrentIndex(index)
+            # Only update List_people table if switching to that specific page
+            if index == 1:
+                self.page2.update_table()
+            # The History page's update_data is called when switching from List_people,
+            # so no explicit call is needed here unless you want to force a refresh
+            # when directly navigating to History from other non-List pages.
+
+            for inx, btn in enumerate(self.menu_buttonss):
+                btn.setStyleSheet("""QPushButton {
+                    background-color: #F0EBE3;
+                    border: 0px;
+                    border-radius: 20px;
+                    padding: 10px;
+                    color: #112D4E;
+                    font-size: 16px;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #CCD3CA;
+                    border: 0;
+                    color: #151515;
+                }
+                """)
+                btn.setIcon(QIcon(self.images[inx]))
+                btn.setIconSize(QSize(25, 25))
+            
+            self.menu_buttonss[index].setStyleSheet("""QPushButton {
+                background-color: #45474B;
                 border: 0px;
                 border-radius: 20px;
                 padding: 10px;
-                color: #112D4E;
+                color: #F0EBE3;
                 font-size: 16px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #CCD3CA;
-                border: 0;
-                color: #151515;
-            }
-            """)
-            btn.setIcon(QIcon(self.images[inx]))
-            btn.setIconSize(QSize(25, 25))
-        # Only update table if it's the List_people page
-        if index == 1:
-            self.page2.update_table()
-        
-
-        self.menu_buttonss[index].setStyleSheet("""QPushButton {
-            background-color: #45474B;
-            border: 0px;
-            border-radius: 20px;
-            padding: 10px;
-            color: #F0EBE3;
-            font-size: 16px;
-            font-weight: bold;
-        }""")
-        self.menu_buttonss[index].setIcon(QIcon(self.image[index]))
-        self.menu_buttonss[index].setIconSize(QSize(25, 25))
+            }""")
+            self.menu_buttonss[index].setIcon(QIcon(self.image[index]))
+            self.menu_buttonss[index].setIconSize(QSize(25, 25))
 
 if __name__ == '__main__':
     app = QApplication([])
