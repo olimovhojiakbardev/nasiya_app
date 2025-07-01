@@ -9,10 +9,10 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Qarz daftar")
-        self.setFixedSize(1000, 700)
+        self.setMinimumSize(1000, 700)  # Set minimum size for the main window
 
         self.main_layout = QHBoxLayout()
-        self.main_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        # self.main_layout.setAlignment(Qt.AlignmentFlag.AlignLeft) # Removed as stretch will handle alignment
 
         self.side_menu = QVBoxLayout()
         self.side_menu.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -20,7 +20,11 @@ class MainWindow(QMainWindow):
         self.menu_widget = QWidget()
         self.menu_widget.setLayout(self.side_menu)
         self.menu_widget.setStyleSheet("background-color: #F0EBE3; border: 0px; border-radius: 20px;")
-        self.menu_widget.setFixedSize(200, 680)
+        # self.menu_widget.setFixedSize(200, 680) # Changed to setMinimumWidth
+        self.menu_widget.setMinimumWidth(200) # Minimum width, flexible height
+        self.menu_widget.setMaximumWidth(250) # Optional: Set a maximum width for the side menu
+        self.menu_widget.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Expanding)
+
 
         shadow_effect = QGraphicsDropShadowEffect()
         shadow_effect.setBlurRadius(30)
@@ -33,15 +37,9 @@ class MainWindow(QMainWindow):
         self.menu_buttons = ['Qarz Qo\'shish', 'Qarzlarni ko\'rish', 'statistika', 'Bildirishlar']
         self.images = ['add.png', 'view.png', 'stat.png', 'report.png']
         self.image = ['addwhite.png', 'viewhite.png', 'statwhite.png', 'reportwhite.png']
-        from PIL import Image
-
-        image = Image.open('addwhite.png')
-        image.save('newadd.png')
-
         
-        image = Image.open('viewhite.png')
-        image.save('newview.png')
-
+        # Removed redundant image saving operations. These should be handled during deployment
+        # or as part of a resource compilation, not at runtime repeatedly.
 
         for inx, button_name in enumerate(self.menu_buttons):
             btn = QPushButton(button_name)
@@ -65,8 +63,12 @@ QPushButton:hover {
 }
 """)
             self.menu_buttonss.append(btn) 
+        
+        self.side_menu.addStretch() # Added stretch to push buttons to top
 
         self.content_area = QStackedWidget()
+        self.content_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
 
         self.page1 = Add_page()
         self.page2 = List_people(self.content_area)
@@ -82,7 +84,7 @@ QPushButton:hover {
 
 
         self.main_layout.addWidget(self.menu_widget)
-        self.main_layout.addWidget(self.content_area)
+        self.main_layout.addWidget(self.content_area, 1) # Add stretch factor to content_area
         container = QWidget()
         container.setLayout(self.main_layout)
         self.setCentralWidget(container)
@@ -107,7 +109,9 @@ QPushButton:hover {
             """)
             btn.setIcon(QIcon(self.images[inx]))
             btn.setIconSize(QSize(25, 25))
-        self.page2.update_table()
+        # Only update table if it's the List_people page
+        if index == 1:
+            self.page2.update_table()
         
 
         self.menu_buttonss[index].setStyleSheet("""QPushButton {

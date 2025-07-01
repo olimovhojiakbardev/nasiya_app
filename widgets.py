@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QLineEdit, QLabel, QVBoxLayout, QWidget, QDialog, QTableWidget, QHBoxLayout, QPushButton, QGraphicsDropShadowEffect, QComboBox, QTableWidgetItem, QHeaderView, QMessageBox, QFormLayout
+from PyQt6.QtWidgets import QLineEdit, QLabel, QVBoxLayout, QWidget, QDialog, QTableWidget, QHBoxLayout, QPushButton, QGraphicsDropShadowEffect, QComboBox, QTableWidgetItem, QHeaderView, QMessageBox, QFormLayout, QSizePolicy
 from PyQt6.QtCore import Qt, QSize, QDate
 from PyQt6.QtGui import QColor, QIcon, QPixmap, QImage
 from datetime import datetime, timedelta
@@ -14,6 +14,7 @@ class CustomDialog(QDialog):
     def __init__(self, name, amount, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Message")
+        self.setMinimumSize(300, 150) # Set a minimum size for the dialog
         
         # Main layout
         layout = QVBoxLayout(self)
@@ -69,6 +70,7 @@ class FocusShadowLineEdit(QLineEdit):
         """)
         self.is_last = is_last
         self.button = button
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed) # Allow horizontal expansion
 
     def keyPressEvent(self, event):
         if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
@@ -84,6 +86,7 @@ class create_label(QLabel):
     def __init__(self, text):
         super().__init__(text)
         self.setStyleSheet("font-size: 14px; color: #151515; font-family: Verdana, sans-serif; padding-left: 3px")
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed) # Preferred width, fixed height
 
 
 class FormattedLineEdit(QLineEdit):
@@ -109,6 +112,7 @@ class FormattedLineEdit(QLineEdit):
             }
         """)
         self.textChanged.connect(self.format_text)
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed) # Allow horizontal expansion
 
     def format_text(self):
         text = self.text().replace(" ", "")
@@ -136,7 +140,7 @@ class FormattedLineEdit(QLineEdit):
 class Add_page(QWidget):
     def __init__(self):
         super().__init__()
-        self.main_layout = QVBoxLayout()
+        self.main_layout = QVBoxLayout(self) # Set layout directly on the widget
 
         self.search_line = FocusShadowLineEdit()
         self.name_line = FocusShadowLineEdit()
@@ -146,7 +150,7 @@ class Add_page(QWidget):
         self.save_btn = QPushButton("Saqlash")
         self.date_line = FocusShadowLineEdit(True, self.save_btn)
         self.save_btn.clicked.connect(self.save_to_database)
-        self.save_btn.clicked.connect(self.update_table)
+        # self.save_btn.clicked.connect(self.update_table) # Update table after saving is handled by the dialog
         
         self.name_lbl = create_label("Ism kiriting:")
         self.contact_lbl = create_label("Telefon raqam kiriting (99-123-4567):")
@@ -156,6 +160,9 @@ class Add_page(QWidget):
 
         self.table = QTableWidget()
         self.table.horizontalHeader().setDefaultSectionSize(50)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch) # Make columns stretch
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch) # Make rows stretch
+        self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding) # Allow table to expand
 
         self.shadow_effect = QGraphicsDropShadowEffect()
         self.shadow_effect.setBlurRadius(30)
@@ -163,20 +170,24 @@ class Add_page(QWidget):
         self.shadow_effect.setColor(QColor(128, 128, 128))
         
         self.search_line.setPlaceholderText("Qidiruvga ism yoki telefon raqam kiriting...")
-        self.search_line.setFixedSize(405, 40)
+        # self.search_line.setFixedSize(405, 40) # Removed fixed size
+        self.search_line.setFixedHeight(40) # Keep fixed height for line edits
         self.search_line.textChanged.connect(self.update_table)
         self.search_layout = QHBoxLayout()
+        self.search_layout.addStretch() # Center the search line
         self.search_layout.addWidget(self.search_line)
-        self.search_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.search_layout.addStretch() # Center the search line
 
         self.name_line.setPlaceholderText("Ism yarating...")
-        self.name_line.setFixedSize(350, 40)
+        # self.name_line.setFixedSize(350, 40) # Removed fixed size
+        self.name_line.setFixedHeight(40)
         name_layout = QVBoxLayout()
         name_layout.addWidget(self.name_lbl)
         name_layout.addWidget(self.name_line)
         name_layout.setSpacing(3)
 
-        self.contact_line.setFixedSize(350, 40)
+        # self.contact_line.setFixedSize(350, 40) # Removed fixed size
+        self.contact_line.setFixedHeight(40)
         self.contact_line.setInputMask("00-000-0000;_")
 
         contact_layout = QVBoxLayout()
@@ -185,12 +196,13 @@ class Add_page(QWidget):
         contact_layout.setSpacing(3)
 
         first_row = QHBoxLayout()
-        first_row.addLayout(name_layout)
-        first_row.addLayout(contact_layout)
+        first_row.addLayout(name_layout, 1) # Add stretch factor
+        first_row.addLayout(contact_layout, 1) # Add stretch factor
         first_row.setSpacing(50)
 
         self.description_line.setPlaceholderText("Izoh qoldiring...")
-        self.description_line.setFixedSize(750, 50)
+        # self.description_line.setFixedSize(750, 50) # Removed fixed size
+        self.description_line.setFixedHeight(50)
         self.description_layout = QVBoxLayout()
         self.description_layout.addWidget(self.description_lbl)
         self.description_layout.addWidget(self.description_line)
@@ -198,33 +210,38 @@ class Add_page(QWidget):
         self.description_layout.setSpacing(5)
 
         self.amount_line.setPlaceholderText("Summani kiriting: ")
-        self.amount_line.setFixedSize(250, 40)
+        # self.amount_line.setFixedSize(250, 40) # Removed fixed size
+        self.amount_line.setFixedHeight(40)
         self.amount_layout = QVBoxLayout()
         self.amount_layout.addWidget(self.amount_lbl)
         self.amount_layout.addWidget(self.amount_line)
         self.amount_layout.setSpacing(3)
 
-        self.date_line.setFixedSize(200, 40)
+        # self.date_line.setFixedSize(200, 40) # Removed fixed size
+        self.date_line.setFixedHeight(40)
         self.date_line.setInputMask("00/00/0000;_")
         self.date_layout = QVBoxLayout()
         self.date_layout.addWidget(self.date_lbl)
         self.date_layout.addWidget(self.date_line)
         self.date_layout.setSpacing(3)
 
-        self.save_btn.setFixedSize(200, 40)
+        # self.save_btn.setFixedSize(200, 40) # Removed fixed size
+        self.save_btn.setMinimumSize(150, 40) # Set minimum size for button
+        self.save_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.save_btn.setStyleSheet("font-size: 18px; border: 0px; border-radius: 12px; background: #525CEB; color: #F8EDFF")
         self.save_btn.setGraphicsEffect(self.shadow_effect)
         self.save_btn.pressed.connect(self.save_btn_press)
         self.save_btn.released.connect(self.save_btn_release)
 
         self.last_row = QHBoxLayout()
-        self.last_row.addLayout(self.amount_layout)
-        self.last_row.addLayout(self.date_layout)
+        self.last_row.addLayout(self.amount_layout, 1) # Add stretch factor
+        self.last_row.addLayout(self.date_layout, 1) # Add stretch factor
         self.last_row.addWidget(self.save_btn)
+        self.last_row.addStretch() # Push button to left if needed
 
         self.table.setColumnCount(4)
         self.table.setHorizontalHeaderLabels(['Ism', 'Telefon', 'Summa', 'Copy'])
-        self.table.setFixedSize(800, 360)
+        # self.table.setFixedSize(800, 360) # Removed fixed size
         self.table.setStyleSheet("""
         QTableWidget {
             font-size: 16px;
@@ -239,21 +256,21 @@ class Add_page(QWidget):
             }
         """)
 
-        self.table.setColumnWidth(0, 280)
-        self.table.setColumnWidth(1, 170)
-        self.table.setColumnWidth(2, 200)
-        self.table.setColumnWidth(3, 90)
+        # self.table.setColumnWidth(0, 280) # Removed fixed column widths, let stretch handle it
+        # self.table.setColumnWidth(1, 170)
+        # self.table.setColumnWidth(2, 200)
+        # self.table.setColumnWidth(3, 90)
         self.update_table()
 
         self.main_layout.addLayout(self.search_layout)
         self.main_layout.addLayout(first_row)
         self.main_layout.addLayout(self.description_layout)
         self.main_layout.addLayout(self.last_row)
-        self.main_layout.addWidget(self.table)
-        self.main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.main_layout.addWidget(self.table, 1) # Add stretch factor to table
+        self.main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter) # Align content to center horizontally
+        self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop) # Align content to top vertically
         self.main_layout.setSpacing(10)
-        self.setLayout(self.main_layout)
+        # self.setLayout(self.main_layout) # Already set in constructor
 
     def show_message(self, name, amount):
         dialog = CustomDialog(name, amount)
@@ -261,23 +278,22 @@ class Add_page(QWidget):
 
         if result == QDialog.DialogCode.Accepted:
             selected_date = dialog.get_date()
-            QMessageBox.information(None, "Date", f"Confirmed Date: {selected_date}")
-            # Save the data with the confirmed or changed date
+            # QMessageBox.information(None, "Date", f"Confirmed Date: {selected_date}") # Removed redundant message box
             return selected_date
         else:
-            QMessageBox.information(None, "Cancelled", "The operation was cancelled.")
+            # QMessageBox.information(None, "Cancelled", "The operation was cancelled.") # Removed redundant message box
             return None
 
     def update_table(self):
         core = Database()
-        if not "'" in self.search_line.text():
-            self.search_line.setText(self.search_line.text())
-        else:
-            error = QMessageBox.information(self, 'Error', "Qidiruvga ' belgisi kiritmang❗")
-            self.search_line.clear()
-            return
-        temp = self.search_line.text()
-        data = core.find_customers(temp)
+        # Sanitize input to prevent SQL injection or unexpected behavior
+        search_text = self.search_line.text().replace("'", "") 
+        if self.search_line.text() != search_text: # If text was modified, update the line edit
+            self.search_line.blockSignals(True) # Block signals to prevent re-triggering textChanged
+            self.search_line.setText(search_text)
+            self.search_line.blockSignals(False)
+
+        data = core.find_customers(search_text)
         self.table.setRowCount(len(data))
         for i,val in enumerate(data):
             self.table.setRowHeight(i, 40)
@@ -301,7 +317,7 @@ class Add_page(QWidget):
 
     def copy_row_data(self, row):
         data = []
-        core = Database()
+        # core = Database() # Not needed here
         self.amount_line.clear()
         self.date_line.clear()
         for col in range(3):
@@ -324,8 +340,8 @@ class Add_page(QWidget):
             temp = self.date_line.text()
             date_obj = datetime.strptime(temp, "%d/%m/%Y")
             promised_date = date_obj.strftime("%Y-%m-%d")
-        except:
-            error_message = QMessageBox.information(self, "Error", "Sana noto'g'ri kiritildi ❌")
+        except ValueError: # Catch specific ValueError for datetime parsing
+            QMessageBox.information(self, "Error", "Sana noto'g'ri kiritildi ❌")
             self.date_line.clear()
             return
         current_datetime = datetime.now()
@@ -340,24 +356,7 @@ class Add_page(QWidget):
                 'issued_date' : issued_date
             }
             selected_date = self.show_message(name, amount)
-            # reply = QMessageBox.question(self, 'Message',
-            #                  f"{name} ga {amount} so'm qo'shilsinmi?",
-            #                  QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            #                  QMessageBox.StandardButton.No)
-
-            # if reply == QMessageBox.StandardButton.Yes:
-            #     core = Database()
-            #     check = core.process_customer_debt(data)
-            #     if check:
-            #         QMessageBox.information(self, 'Message', f"{amount} so'm {name} ga qo'shildi ✅")
-            #         self.amount_line.clear()
-            #         self.date_line.clear()
-            #     else:
-            #         QMessageBox.information(self, "Message", "Xatolik yuz berdi❌")
-            # else:
-            #     QMessageBox.information(self, "Message", "Xatolik yuz berdi❌")
            
-
             if selected_date:
                 try:
                     # Convert the selected date into a datetime object
@@ -380,25 +379,30 @@ class Add_page(QWidget):
                         QMessageBox.information(self, 'Message', f"{amount} so'm {name} ga qo'shildi ✅")
                         self.amount_line.clear()
                         self.date_line.clear()
+                        self.update_table() # Update table after successful save
                     else:
                         QMessageBox.information(self, "Message", "Xatolik yuz berdi❌")
                 except ValueError:
                     QMessageBox.information(self, "Error", "Sana noto'g'ri kiritildi ❌")
             else:
                 QMessageBox.information(self, "Message", "Amal bekor qilindi")
+        else:
+            QMessageBox.information(self, "Error", "Iltimos, barcha maydonlarni to'ldiring. ❌") # Added a message for incomplete fields
 
             
 class List_people(QWidget):
     def __init__(self, stacked_widget) -> None:
         super().__init__()
         self.stacked_widget = stacked_widget
-        self.main_layout = QVBoxLayout()
+        self.main_layout = QVBoxLayout(self) # Set layout directly on the widget
 
         self.search_line = FocusShadowLineEdit()
         self.table = QTableWidget()
         self.table.horizontalHeader().setDefaultSectionSize(50)
+        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch) # Make columns stretch
+        self.table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch) # Make rows stretch
+        self.table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding) # Allow table to expand
 
-        self.search_line.setPlaceholderText("Qidiruvga ism yoki telefon raqam kiriting...")
 
         self.shadow_effect = QGraphicsDropShadowEffect()
         self.shadow_effect.setBlurRadius(30)
@@ -406,15 +410,17 @@ class List_people(QWidget):
         self.shadow_effect.setColor(QColor(128, 128, 128))
 
         self.search_line.setPlaceholderText("Qidiruvga ism yoki telefon raqam kiriting...")
-        self.search_line.setFixedSize(405, 40)
+        # self.search_line.setFixedSize(405, 40) # Removed fixed size
+        self.search_line.setFixedHeight(40)
         self.search_line.textChanged.connect(self.update_table)
         self.search_layout = QHBoxLayout()
+        self.search_layout.addStretch()
         self.search_layout.addWidget(self.search_line)
-        self.search_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.search_layout.addStretch()
 
         self.table.setColumnCount(5)
         self.table.setHorizontalHeaderLabels(['Ism', 'Telefon', 'Summa', "Tarix", "To'lov"])
-        self.table.setFixedSize(800, 600)
+        # self.table.setFixedSize(800, 600) # Removed fixed size
         self.table.setStyleSheet("""
         QTableWidget {
             font-size: 16px;
@@ -429,30 +435,30 @@ class List_people(QWidget):
             }
         """)
 
-        self.table.setColumnWidth(0, 190)
-        self.table.setColumnWidth(1, 170)
-        self.table.setColumnWidth(2, 200)
-        self.table.setColumnWidth(3, 90)
-        self.table.setColumnWidth(4, 90)
+        # self.table.setColumnWidth(0, 190) # Removed fixed column widths
+        # self.table.setColumnWidth(1, 170)
+        # self.table.setColumnWidth(2, 200)
+        # self.table.setColumnWidth(3, 90)
+        # self.table.setColumnWidth(4, 90)
         self.update_table()
 
         self.main_layout.addLayout(self.search_layout)
-        self.main_layout.addWidget(self.table)
+        self.main_layout.addWidget(self.table, 1) # Add stretch factor to table
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.main_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.main_layout.setSpacing(10)
-        self.setLayout(self.main_layout)
+        # self.setLayout(self.main_layout) # Already set in constructor
 
     def update_table(self):
         core = Database()
-        if not "'" in self.search_line.text():
-            self.search_line.setText(self.search_line.text())
-        else:
-            QMessageBox.information(self, 'Error', "Qidiruvga ' belgisi kiritmang❗")
-            self.search_line.clear()
-            return
-        temp = self.search_line.text()
-        data = core.find_customers(temp)
+        # Sanitize input to prevent SQL injection or unexpected behavior
+        search_text = self.search_line.text().replace("'", "")
+        if self.search_line.text() != search_text:
+            self.search_line.blockSignals(True)
+            self.search_line.setText(search_text)
+            self.search_line.blockSignals(False)
+
+        data = core.find_customers(search_text)
         self.table.setRowCount(len(data))
         for i,val in enumerate(data):
             self.table.setRowHeight(i, 40)
@@ -490,10 +496,11 @@ class payment(QWidget):
         super().__init__()
         self.main_window = main_window
         self.customer_id = customer_id
-        self.setFixedSize(400, 300)
+        # self.setFixedSize(400, 300) # Removed fixed size
+        self.setMinimumSize(400, 300) # Set minimum size for payment window
         self.setWindowTitle("To'lov oynasi")
         self.setStyleSheet("font-size: 18px")
-        self.main_layout = QVBoxLayout()
+        self.main_layout = QVBoxLayout(self) # Set layout directly on the widget
         
         core = Database()
         data = core.find_customer(self.customer_id)
@@ -507,16 +514,18 @@ class payment(QWidget):
 
         self.comment_line = FocusShadowLineEdit()
         self.comment_line.setPlaceholderText("Izoh qoldiring...")
-        self.comment_line.setFixedSize(380, 40)
+        # self.comment_line.setFixedSize(380, 40) # Removed fixed size
+        self.comment_line.setFixedHeight(40)
 
         self.amount_lbl = QLabel("Summani kiriting: ")
         self.amount_lbl.setStyleSheet("font-size: 20px")
         self.amount_line = FormattedLineEdit()
         self.amount_line.setPlaceholderText("Summani kiriting: ")
-        self.amount_line.setFixedSize(200, 40)
+        # self.amount_line.setFixedSize(200, 40) # Removed fixed size
+        self.amount_line.setFixedHeight(40)
         self.amount_layout = QHBoxLayout()
         self.amount_layout.addWidget(self.amount_lbl)
-        self.amount_layout.addWidget(self.amount_line)
+        self.amount_layout.addWidget(self.amount_line, 1) # Add stretch factor
         self.amount_layout.setSpacing(3)
 
         self.shadow_effect = QGraphicsDropShadowEffect()
@@ -525,7 +534,9 @@ class payment(QWidget):
         self.shadow_effect.setColor(QColor(128, 128, 128))
 
         self.save_btn = QPushButton("To'lash")
-        self.save_btn.setFixedSize(200, 40)
+        # self.save_btn.setFixedSize(200, 40) # Removed fixed size
+        self.save_btn.setMinimumSize(150, 40)
+        self.save_btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.save_btn.setStyleSheet("font-size: 18px; border: 0px; border-radius: 12px; background: #525CEB; color: #F8EDFF")
         self.save_btn.setGraphicsEffect(self.shadow_effect)
         self.save_btn.pressed.connect(self.save_btn_press)
@@ -533,19 +544,24 @@ class payment(QWidget):
         self.save_btn.clicked.connect(self.save_to_database)
 
         self.main_layout.addLayout(form_layout)
-        self.main_layout.addStretch()
+        self.main_layout.addStretch(1) # Add stretch
         self.main_layout.addWidget(self.comment_line)
-        self.main_layout.addStretch()
+        self.main_layout.addStretch(1) # Add stretch
         self.main_layout.addLayout(self.amount_layout)
-        self.main_layout.addStretch()
+        self.main_layout.addStretch(1) # Add stretch
         self.main_layout.addWidget(self.save_btn, 0, Qt.AlignmentFlag.AlignCenter)
 
-        self.setLayout(self.main_layout)
+        # self.setLayout(self.main_layout) # Already set in constructor
 
     def save_to_database(self):
         amount = self.amount_line.text()
         amount = amount.replace(" ", "")
-        amount = int(amount)
+        try:
+            amount = int(amount)
+        except ValueError:
+            QMessageBox.information(self, "Error", "Summa noto'g'ri kiritildi ❌")
+            return
+
         comment = self.comment_line.text()
         if not comment:
             comment = "Izoh qoldirilmagan"
@@ -583,12 +599,16 @@ class History(QWidget):
         self.UI()
         self.layouts()
 
+        self.setLayout(self.main_layout) # Set layout here
+
     def UI(self):
         self.back_btn = QPushButton()
         self.back_btn.clicked.connect(self.back_to_list)
         self.back_btn.setIcon(QIcon('back_btn.png'))
         self.back_btn.setIconSize(QSize(25, 25))
-        self.back_btn.setFixedSize(50, 50)
+        # self.back_btn.setFixedSize(50, 50) # Removed fixed size
+        self.back_btn.setMinimumSize(50, 50)
+        self.back_btn.setMaximumSize(50, 50) # Keep button square
         self.back_btn.setStyleSheet("""
             QPushButton {
                 border: 0px; 
@@ -614,7 +634,10 @@ class History(QWidget):
         self.debt_table.horizontalHeader().setDefaultSectionSize(50)
         self.debt_table.setColumnCount(2)
         self.debt_table.setHorizontalHeaderLabels(['Summa', 'Olingan vaqt'])
-        self.debt_table.setFixedSize(375, 450)
+        # self.debt_table.setFixedSize(375, 450) # Removed fixed size
+        self.debt_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.debt_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.debt_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.debt_table.setStyleSheet("""
         QTableWidget {
             font-size: 16px;
@@ -629,16 +652,18 @@ class History(QWidget):
                 color: #C7253E
             }
         """)
-        self.debt_table.setColumnWidth(0,165)
-        self.debt_table.setColumnWidth(1,210)
+        # self.debt_table.setColumnWidth(0,165) # Removed fixed column widths
+        # self.debt_table.setColumnWidth(1,210)
         self.debt_table.cellClicked.connect(self.show_overflow_text1)
 
-        self.payed_table = QTableWidget()
         self.payed_table = QTableWidget()
         self.payed_table.horizontalHeader().setDefaultSectionSize(50)
         self.payed_table.setColumnCount(2)
         self.payed_table.setHorizontalHeaderLabels(['Summa', 'Olingan vaqt'])
-        self.payed_table.setFixedSize(375, 450)
+        # self.payed_table.setFixedSize(375, 450) # Removed fixed size
+        self.payed_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.payed_table.verticalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.payed_table.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.payed_table.setStyleSheet("""
         QTableWidget {
             font-size: 16px;
@@ -653,8 +678,8 @@ class History(QWidget):
                 color: #00712D
             }
         """)
-        self.payed_table.setColumnWidth(0,165)
-        self.payed_table.setColumnWidth(1,210)
+        # self.payed_table.setColumnWidth(0,165) # Removed fixed column widths
+        # self.payed_table.setColumnWidth(1,210)
         self.payed_table.cellClicked.connect(self.show_overflow_text2)
 
         self.main_layout = QVBoxLayout()
@@ -670,23 +695,34 @@ class History(QWidget):
         shadow.setColor(QColor(128, 128, 128))
 
         self.name_lbl.setStyleSheet("font-size: 25px; color: #333333; font-weight: bold; font-family: 'Roboto';")
-        self.name_lbl.setFixedHeight(70)
+        # self.name_lbl.setFixedHeight(70) # Removed fixed height
+        self.name_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
+
 
         self.description_lbl.setStyleSheet("font-size: 18px;; color: #333333; font-weight: bold; font-family: 'Roboto';")
-        self.description_lbl.setFixedHeight(40)
+        # self.description_lbl.setFixedHeight(40) # Removed fixed height
+        self.description_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
+
 
         self.contact_lbl.setStyleSheet("font-size: 18px;color: #333333; font-weight: bold; font-family: 'Roboto';")
-        self.contact_lbl.setFixedHeight(40)
+        # self.contact_lbl.setFixedHeight(40) # Removed fixed height
+        self.contact_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
 
-        self.setLayout(self.main_layout)
 
         self.debt_lbl.setStyleSheet("font-size: 18px; color: #C7253E; font-weight: bold; font-family: 'Roboto'; background: #FEFAE0; padding-left: 3px")
         self.overall_lbl.setStyleSheet("font-size: 18px; color: #333333; font-weight: bold; font-family: 'Roboto'; background: #FEFAE0; padding-left: 3px")        
         self.payed_lbl.setStyleSheet("font-size: 18px; color: #00712D; font-weight: bold; font-family: 'Roboto'; background: #FEFAE0; padding-left: 3px")
 
-        self.debt_lbl.setFixedSize(250, 50)
-        self.overall_lbl.setFixedSize(250, 50)
-        self.payed_lbl.setFixedSize(250, 50)
+        # self.debt_lbl.setFixedSize(250, 50) # Removed fixed size
+        # self.overall_lbl.setFixedSize(250, 50) # Removed fixed size
+        # self.payed_lbl.setFixedSize(250, 50) # Removed fixed size
+        self.debt_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.overall_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.payed_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.debt_lbl.setFixedHeight(50)
+        self.overall_lbl.setFixedHeight(50)
+        self.payed_lbl.setFixedHeight(50)
+
 
     def show_overflow_text1(self, row, column):
         core = Database()
@@ -765,282 +801,36 @@ class History(QWidget):
 
     def layouts(self):
         self.info_layout.addWidget(self.back_btn)
+        self.info_layout.addStretch(1) # Add stretch to push back button to left
         
         self.description_layout.addWidget(self.name_lbl)
         self.description_layout.addWidget(self.description_lbl)
         self.description_layout.addWidget(self.contact_lbl)
+        self.description_layout.addStretch(1) # Add stretch to push labels to top
 
-        self.info_layout.addLayout(self.description_layout)
+
+        self.info_layout.addLayout(self.description_layout, 1) # Add stretch factor
 
         self.money_layout.addWidget(self.debt_lbl)
         self.money_layout.addWidget(self.overall_lbl)
         self.money_layout.addWidget(self.payed_lbl)
         self.money_layout.setSpacing(0)
+        self.money_layout.addStretch(1) # Add stretch to fill remaining space
 
-        self.table_layout.addWidget(self.debt_table)
-        self.table_layout.addWidget(self.payed_table)
+
+        self.table_layout.addWidget(self.debt_table, 1) # Add stretch factor
+        self.table_layout.addWidget(self.payed_table, 1) # Add stretch factor
         self.table_layout.setSpacing(10)
 
         self.description_layout.setSpacing(0)
         self.main_layout.addLayout(self.info_layout)
         self.main_layout.addLayout(self.money_layout)
-        self.main_layout.addLayout(self.table_layout)
+        self.main_layout.addLayout(self.table_layout, 1) # Add stretch factor to table layout
+        self.main_layout.addStretch(1) # Add stretch to push content to top
+
 
     def back_to_list(self):
-        history_page = List_people(self.stacked_widget)
-        history_page.update_table()
+        # No need to create a new List_people instance, just update the existing one
+        list_people_widget = self.stacked_widget.widget(1)
+        list_people_widget.update_table()
         self.stacked_widget.setCurrentIndex(1)
-
-# class Statistics(QWidget):
-#     def __init__(self, stacked_widget) -> None:
-#         super().__init__()
-#         self.stacked_widget = stacked_widget
-#         self.create_widgets()
-#         self.set_parameters()
-#         self.update_charts('month')
-#         self.layouts()
-#     def create_widgets(self):
-#         self.combo_box = QComboBox()
-#         self.date_line = FocusShadowLineEdit()
-#         self.debts_lbl = QLabel()
-#         self.total_lbl = QLabel()
-#         self.payment_lbl = QLabel()
-#         self.sp_piechart_lbl = QLabel()
-#         self.wh_info_lbl = QLabel()
-#         self.barchar_lbl = QLabel()
-
-#     def update_charts(self, type):
-#         # Example data for the pie chart
-#         pie_labels = ['оплачено', 'остался']
-#         pie_sizes = [60, 40]  # Replace with your actual data
-#         buf_pie = create_pie_chart_image(pie_labels, pie_sizes)
-#         image_pie = QImage.fromData(buf_pie.getvalue())
-#         pixmap_pie = QPixmap.fromImage(image_pie)
-#         self.sp_piechart_lbl.setPixmap(pixmap_pie)
-
-#         # Example data for the bar chart
-#         months = ['янв', 'фев', 'март', 'апр', 'май', 'июнь', 'июль', 'авг', 'сент', 'окт', 'ноя', 'дек']
-#         data1 = np.random.randint(1, 10, size=12)
-#         data2 = np.random.randint(1, 10, size=12)
-#         print(data1)
-#         print(data2)
-#         buf_bar = create_bar_chart_image(months, data1, data2)
-#         image_bar = QImage.fromData(buf_bar.getvalue())
-#         pixmap_bar = QPixmap.fromImage(image_bar)
-#         self.barchar_lbl.setPixmap(pixmap_bar)
-
-#     def set_parameters(self):
-#         self.combo_box.setFixedSize(375, 40)
-#         shadow_effect = QGraphicsDropShadowEffect()
-#         shadow_effect.setBlurRadius(10)
-#         shadow_effect.setOffset(0, 0)
-#         shadow_effect.setColor(QColor(128, 128, 128))
-#         self.combo_box.setGraphicsEffect(shadow_effect)
-#         self.combo_box.setStyleSheet("""
-#             QComboBox {
-#                 border: 2px solid #C0C0C0;
-#                 border-radius: 10px;
-#                 padding: 5px;
-#                 font-size: 18px;
-#                 font-family: Verdana, sans-serif;
-#                 background-color: #FFFFFF;
-                
-#             }
-#             QComboBox:focus {
-#                 border: 2px solid #007BFF;
-#                 background-color: #F0F8FF;
-#             }
-#         """)
-#         temp = ['по годам', 'по месяцам', 'по неделям', 'по дням', 'за все время']
-#         self.combo_box.addItems(temp)
-#         self.set_mask(self.combo_box.currentText())
-#         self.combo_box.currentIndexChanged.connect(lambda: self.set_mask(self.combo_box.currentText()))
-
-#     def set_mask(self, text):
-
-#         if text == 'по годам':
-#             self.date_line.setInputMask('0000')
-#         elif text == 'по месяцам':
-#             self.date_line.setInputMask('00/0000;_')
-#         elif text == 'по неделям':
-#             self.date_line.setInputMask('00/00/0000-00/00/0000;_')
-#         elif text == 'по дням':
-#             self.date_line.setInputMask('00/00/0000;_')
-#         elif text == 'за все время':
-#             self.date_line.clear()
-#         self.date_line.textChanged.connect(self.update_stat_page)
-
-#     def update_stat_page(self):
-#         core = Database()
-#         data = core.get_finance_data()
-#         text = self.combo_box.currentText()
-#         if text == 'по годам':
-#             if int(self.date_line.text().strip()) > 2023:
-#                 year = int(self.date_line.text().strip())
-#                 debts = [debt for debt in data['debts'] if debt[1].year == year]
-#                 payments = [payment for payment in data['payments'] if payment[1].year == year]
-#                 print(debts, payments)
-#             else:
-#                 return
-#         elif text == 'по месяцам':
-#             self.date_line.setInputMask('00/0000;_')
-#         elif text == 'по неделям':
-#             self.date_line.setInputMask('00/00/0000-00/00/0000;_')
-#         elif text == 'по дням':
-#             self.date_line.setInputMask('00/00/0000;_')
-#         elif text == 'за все время':
-#             pass
-
-#     def layouts(self):
-#         self.main_layout = QVBoxLayout()
-#         self.main_layout.setSpacing(20)
-
-#         self.setting_spec = QHBoxLayout()
-#         self.number_layout = QHBoxLayout()
-#         self.pie_charts = QHBoxLayout()
-
-#         self.setting_spec.addWidget(self.combo_box)
-#         self.setting_spec.addWidget(self.date_line)
-
-#         self.number_layout.addWidget(self.debts_lbl)
-#         self.number_layout.addWidget(self.total_lbl)
-#         self.number_layout.addWidget(self.payment_lbl)
-
-#         self.pie_charts.addWidget(self.sp_piechart_lbl)
-#         self.pie_charts.addWidget(self.wh_info_lbl)
-
-#         self.main_layout.addLayout(self.setting_spec)
-#         self.main_layout.addLayout(self.number_layout)
-#         self.main_layout.addLayout(self.pie_charts)
-#         self.main_layout.addWidget(self.barchar_lbl)
-#         self.setLayout(self.main_layout)
-
-
-
-# class StatisticsPage(QWidget):
-#     def __init__(self):
-#         super().__init__()
-#         self.initUI()
-
-#     def initUI(self):
-#         # Initialize and set up the combo box
-#         self.combo_box = QComboBox()
-#         self.combo_box.addItems(['по годам', 'по месяцам', 'по неделям', 'за все время'])
-#         self.combo_box.currentIndexChanged.connect(self.update_charts)
-        
-#         # Initialize and set up the line edit with default date
-#         self.line_edit = QLineEdit()
-#         default_date = self.get_default_date()
-#         self.line_edit.setText(default_date.strftime('%Y-%m-%d'))
-#         self.line_edit.textChanged.connect(self.update_charts)
-        
-#         # Initialize and set up the labels
-#         self.total_debts_label = QLabel("Total Debts: 0 UZS")
-#         self.paid_amount_label = QLabel("Paid Amount: 0 UZS")
-#         self.remaining_debts_label = QLabel("Remaining Debts: 0 UZS")
-        
-#         # Initialize pie chart info label
-#         self.pie_info_label = QLabel("Total Debts: 0 UZS")
-        
-#         # Initialize Matplotlib figure and canvas
-#         self.figure = plt.figure(figsize=(8, 6))
-#         self.bar_chart_canvas = FigureCanvas(self.figure)
-        
-#         # Layout setup
-#         layout = QVBoxLayout()
-#         layout.addWidget(self.combo_box)
-#         layout.addWidget(self.line_edit)
-#         layout.addWidget(self.total_debts_label)
-#         layout.addWidget(self.paid_amount_label)
-#         layout.addWidget(self.remaining_debts_label)
-#         layout.addWidget(self.pie_info_label)  # Add the pie info label to the layout
-#         layout.addWidget(self.bar_chart_canvas)  # Add the bar chart canvas to the layout
-        
-#         self.setLayout(layout)
-        
-#         # Update charts initially
-#         self.update_charts()
-
-#     def get_default_date(self):
-#         # Get the first day of the last month
-#         today = datetime.now()
-#         first_day_of_current_month = today.replace(day=1)
-#         last_month = first_day_of_current_month - timedelta(days=1)
-#         return last_month.replace(day=1)
-
-#     def update_charts(self):
-#         date_type = self.combo_box.currentText()
-#         date_value = self.line_edit.text()
-        
-#         # Fetch and update data
-#         core = Database()
-#         data = core.fetch_data(date_type, date_value)
-#         self.update_labels(data)
-#         self.update_pie_chart(data)
-#         self.update_bar_chart(data)
-
-#     def update_labels(self, data):
-#         try:
-#             # Replace None with 0 to avoid TypeError
-#             total_debts = sum((item.get('total_debts', 0) or 0) for item in data)
-#             total_payments = sum((item.get('total_payments', 0) or 0) for item in data)
-
-#             remaining_debts = total_debts - total_payments
-
-#             # Update your QLabel widgets with the calculated values
-#             self.total_debts_label.setText(f"Total Debts: {total_debts} UZS")
-#             self.paid_amount_label.setText(f"Paid Amount: {total_payments} UZS")
-#             self.remaining_debts_label.setText(f"Remaining Debts: {remaining_debts} UZS")
-#         except Exception as e:
-#             print(f"Error updating labels: {e}")
-
-#     def update_pie_chart(self, data):
-#         # Filter out items where 'total_debts' is None and convert to zero
-#         filtered_data = [item for item in data if item.get('total_debts') is not None]
-
-#         if not filtered_data:
-#             # Handle case where no valid data is available
-#             print("No valid data to display in pie chart.")
-#             return
-
-#         total_debts = sum(item.get('total_debts', 0) for item in filtered_data)
-
-#         if total_debts == 0:
-#             # Handle case where total debts are zero
-#             print("Total debts are zero, cannot display pie chart.")
-#             return
-
-#         # Proceed with pie chart plotting
-#         pie_labels = []
-#         pie_values = []
-
-#         for item in filtered_data:
-#             # Use a default label if 'label' is not present
-#             label = item.get('label', 'Unknown')
-#             pie_labels.append(label)
-#             pie_values.append(item.get('total_debts', 0))
-
-#         # Create and update the pie chart
-#         self.figure.clear()
-#         ax = self.figure.add_subplot(121)
-#         ax.clear()
-#         ax.pie(pie_values, labels=pie_labels, autopct='%1.1f%%')
-
-#         # Update the pie chart info label
-#         self.pie_info_label.setText(f"Total Debts: {total_debts} UZS")
-
-#     def update_bar_chart(self, data):
-#         self.figure.clear()
-#         dates = [item.get('date') for item in data if 'date' in item]
-#         debts = [item.get('total_debts', 0) for item in data if 'total_debts' in item]
-#         payments = [item.get('total_payments', 0) for item in data if 'total_payments' in item]
-
-#         ax = self.figure.add_subplot(122)
-#         ax.bar(dates, debts, label='Debts')
-#         ax.bar(dates, payments, label='Payments', bottom=debts)
-        
-#         ax.set_ylabel('Amount (UZS)')
-#         ax.set_title('Daily/Monthly Statistics')
-#         ax.legend()
-
-#         self.bar_chart_canvas.draw()
