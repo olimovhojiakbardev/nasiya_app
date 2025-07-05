@@ -1,0 +1,17 @@
+# --- Python Virtual Environment ---
+venv/
+
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+
+*.pdf
+*.sql
+*.sql.gz
+
+
+.vscode/
+
+config.py

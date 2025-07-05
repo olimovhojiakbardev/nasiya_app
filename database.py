@@ -1,28 +1,67 @@
 import mysql.connector
 from mysql.connector import Error
+import time
 
 class Database:
-    def __init__(self) -> None:
+    def __init__(self):
+        """
+        The constructor now immediately tries to establish a
+        persistent connection.
+        """
         self.connection = None
-        self.init()
-    def init(self) -> None:
+        # --- Corrected: Removed trailing commas ---
+        self.host = 'localhost'
+        self.user = 'root'
+        self.password = 'SecureRoot#2025'
+        self.database = 'qarz_db'
         try:
             self.connection = mysql.connector.connect(
-                host='localhost',
-                user='root',
-                password='SecureRoot#2025',
-                database='qarz_db'
+                host=self.host,
+                user=self.user,
+                password=self.password,
+                database=self.database
             )
+            print("Database connection established successfully.")
         except Error as e:
-            print(f"Error while connecting to MySQL: {e}")
+            print(f"FATAL: Could not connect to MySQL: {e}")
+            self.connection = None
+
+    def _reconnect(self, attempts=3, delay=2):
+        """
+        A private method to handle automatic reconnection if the connection is lost.
+        """
+        if self.connection and self.connection.is_connected():
+            return True # Already connected
+            
+        print("Connection lost. Attempting to reconnect...")
+        for i in range(attempts):
+            try:
+                self.connection = mysql.connector.connect(
+                    host=self.host,
+                    user=self.user,
+                    password=self.password,
+                    database=self.database
+                )
+                if self.connection.is_connected():
+                    print("Reconnection successful.")
+                    return True
+            except Error as e:
+                print(f"Reconnect attempt {i+1}/{attempts} failed: {e}")
+                time.sleep(delay)
+        print("FATAL: Could not reconnect to the database.")
+        return False
 
     def close_connection(self):
-        if self.connection.is_connected() and self.connection:
+        """
+        This method should now only be called ONCE when the application is exiting.
+        """
+        if self.connection and self.connection.is_connected():
             self.connection.close()
+            print("Database connection closed.")
 
     def process_customer_debt(self, data):
+        if not self._reconnect(): return False
         try:
-            self.init()
             cursor = self.connection.cursor()
             name = data['name']
             contact = data['contact']
@@ -62,61 +101,85 @@ class Database:
             )
 
             self.connection.commit()
+            cursor.close()
             return True
-
         except Exception as e:
             print(f"Error processing customer debt: {e}")
-            self.connection.rollback()  # Rollback in case of error
+            if self.connection: self.connection.rollback()
             return False
 
-        finally:
-            self.close_connection()
-
-
-
     def find_customers(self, text):
+        if not self._reconnect(): return []
         try:
-            self.init()
             cursor = self.connection.cursor()
             if text == "":
                 query = 'SELECT name, contact, remained, id FROM customers ORDER BY name'
                 cursor.execute(query)
-                data = cursor.fetchall()
-                return data
             else:
-                query = f"SELECT name, contact, remained, id FROM customers WHERE name like '%{text}%' or contact like '%{text}%' order by name"
-                cursor.execute(query)
-                data = cursor.fetchall()
-                return data
-        except Error as e:
-            print(f"Error while processing customer debt: {e}")
+                query = "SELECT name, contact, remained, id FROM customers WHERE name LIKE %s OR contact LIKE %s ORDER BY name"
+                search_text = f"%{text}%"
+                cursor.execute(query, (search_text, search_text))
 
-        finally:
-            self.close_connection()
-
-    def find_customer(self, text):
-        try:
-            self.init()
-            cursor = self.connection.cursor()
-            cursor.execute('SELECT name, contact FROM customers WHERE id = %s', (text,))
-            data = cursor.fetchone()
+            data = cursor.fetchall()
+            cursor.close()
             return data
         except Error as e:
-            print(f"Error while processing customer debt: {e}")
+            print(f"Error finding customers: {e}")
+            return []
 
-        finally:
-            self.close_connection()
+    def find_customer(self, customer_id):
+        if not self._reconnect(): return None
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute('SELECT name, contact FROM customers WHERE id = %s', (customer_id,))
+            data = cursor.fetchone()
+            cursor.close()
+            return data
+        except Error as e:
+            print(f"Error finding customer by ID: {e}")
+            return None
 
+    def history(self, customer_id):
+        if not self._reconnect(): return None
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute('SELECT name, contact, remained, payed, total FROM customers WHERE id = %s', (customer_id,))
+            person_data = cursor.fetchone()
+            
+            if not person_data:
+                cursor.close()
+                return None
+
+            data = {
+                "person": {
+                    'name': person_data[0],
+                    'contact': person_data[1],
+                    'remained': person_data[2],
+                    'payed': person_data[3],
+                    'total': person_data[4]
+                }
+            }
+            cursor.execute("SELECT id, amount, date_issued, comment, date_promised FROM debts WHERE customer_id = %s ORDER BY date_issued DESC", (customer_id,))
+            data['debts'] = cursor.fetchall()
+
+            cursor.execute("SELECT id, amount, date_issued, comment FROM payments WHERE customer_id = %s ORDER BY date_issued DESC", (customer_id,))
+            data['payments'] = cursor.fetchall()
+            
+            cursor.close()
+            return data
+        except Error as e:
+            print(f"Error fetching history: {e}")
+            return None
 
     def payback(self, customer_id, amount, comment):
+        if not self._reconnect(): return False
         try:
-            self.init()
             cursor = self.connection.cursor()
-
             cursor.execute("SELECT payed, remained FROM customers WHERE id = %s", (customer_id,))
             data = cursor.fetchone()
 
             if data is None:
+                cursor.close()
                 return False
 
             payed, remained = data
@@ -127,151 +190,116 @@ class Database:
                 "UPDATE customers SET payed = %s, remained = %s WHERE id = %s",
                 (payed, remained, customer_id)
             )
-
             cursor.execute(
                 "INSERT INTO payments (customer_id, amount, comment, date_issued) VALUES (%s, %s, %s, NOW())",
                 (customer_id, amount, comment)
             )
 
             self.connection.commit()
+            cursor.close()
             return True
         except Error as e:
-            print(f"Error: {e}")
+            print(f"Error during payback: {e}")
+            if self.connection: self.connection.rollback()
             return False
-        finally:
-            self.close_connection()
 
-    def get_comment1(self, amount, date):
+    def update_customer_contact(self, customer_id, new_contact):
+        if not self._reconnect(): return False
         try:
-            self.init()
             cursor = self.connection.cursor()
-            cursor.execute('SELECT comment FROM debts WHERE amount = %s and date_issued = %s', (amount, date))
-            data = cursor.fetchone()
-            return data
+            cursor.execute("UPDATE customers SET contact = %s WHERE id = %s", (new_contact, customer_id))
+            self.connection.commit()
+            cursor.close()
+            return True
         except Error as e:
-            print(f"Error while processing customer debt: {e}") 
-        finally:
-            self.close_connection()    
+            print(f"Error updating customer contact: {e}")
+            if self.connection: self.connection.rollback()
+            return False
 
-    def get_comment2(self, amount, date):
+    def update_debt_entry(self, debt_id, new_amount, new_comment, new_promised_date):
+        if not self._reconnect(): return False
         try:
-            self.init()
             cursor = self.connection.cursor()
-            cursor.execute('SELECT comment FROM payments WHERE amount = %s and date_issued = %s', (amount, date))
-            data = cursor.fetchone()
-            return data
-        except Error as e:
-            print(f"Error while processing customer debt: {e}") 
-        finally:
-            self.close_connection() 
-
-    def history(self, customer_id):
-        try:
-            self.init()
-            cursor = self.connection.cursor()
-            cursor.execute('SELECT name, contact, remained, payed, total FROM customers WHERE id = %s', (customer_id,))
-            temp1 = cursor.fetchone()
-            data = {
-                "person" : {
-                    'name' : temp1[0], 
-                    'contact' : temp1[1], 
-                    'remained' : temp1[2], 
-                    'total' : temp1[4], 
-                    'payed' : temp1[3]
-                    }
-            }
-            cursor.execute("SELECT amount, date_issued FROM debts WHERE customer_id = %s ORDER BY date_issued desc", (customer_id,))
-
-            temp2 = cursor.fetchall()
-
-            data['debts'] = temp2
-
-            cursor.execute("SELECT amount, date_issued FROM payments WHERE customer_id = %s ORDER BY date_issued desc", (customer_id,))
-
-            temp3 = cursor.fetchall()
-
-            data['payments'] = temp3
-            return data
-        except Error as e:
-            print(f"Error while processing customer debt: {e}") 
-        finally:
-            self.close_connection()
-    
-    def get_finance_data(self):
-        try:
-            self.init()
-            cursor = self.connection.cursor()
-            cursor.execute('SELECT amount, date_issued FROM debts')
-            temp = cursor.fetchall()
-            data = {
-                'debts' : temp
-            }
-            cursor.execute('SELECT amount, date_issued FROM payments')
-            temp = cursor.fetchall()
-            data['payed'] = temp
-            return data
-        except Error as e:
-            print(f"Error while processing customer debt: {e}") 
-        finally:
-            self.close_connection()
-
-    def fetch_data(self, date_type, date_value):
-        cursor = None
-        try:
-            cursor = self.connection.cursor(dictionary=True)
-            print(f"Fetching data for date_type: {date_type} and date_value: {date_value}")
-            if date_type == 'по годам':
-                query = """
-                SELECT
-                    SUM(d.amount) AS total_debts,
-                    COALESCE(SUM(p.amount), 0) AS total_payments
-                FROM debts d
-                LEFT JOIN payments p ON d.customer_id = p.customer_id AND YEAR(d.date_issued) = YEAR(p.date_issued)
-                WHERE YEAR(d.date_issued) = %s
-                """
-                cursor.execute(query, (date_value,))
-            elif date_type == 'по месяцам':
-                query = """
-                SELECT
-                    SUM(d.amount) AS total_debts,
-                    COALESCE(SUM(p.amount), 0) AS total_payments
-                FROM debts d
-                LEFT JOIN payments p ON d.customer_id = p.customer_id AND YEAR(d.date_issued) = YEAR(p.date_issued) AND MONTH(d.date_issued) = MONTH(p.date_issued)
-                WHERE YEAR(d.date_issued) = %s AND MONTH(d.date_issued) = %s
-                """
-                year, month = date_value.split('/')
-                cursor.execute(query, (year, month))
-            elif date_type == 'по неделям':
-                start_date, end_date = date_value.split(' - ')
-                query = """
-                SELECT
-                    DATE(d.date_issued) AS date,
-                    SUM(d.amount) AS total_debts,
-                    COALESCE(SUM(p.amount), 0) AS total_payments
-                FROM debts d
-                LEFT JOIN payments p ON d.customer_id = p.customer_id AND DATE(d.date_issued) = DATE(p.date_issued)
-                WHERE DATE(d.date_issued) BETWEEN %s AND %s
-                GROUP BY DATE(d.date_issued)
-                """
-                cursor.execute(query, (start_date, end_date))
-            elif date_type == 'за все время':
-                query = """
-                SELECT
-                    SUM(d.amount) AS total_debts,
-                    COALESCE(SUM(p.amount), 0) AS total_payments
-                FROM debts d
-                LEFT JOIN payments p ON d.customer_id = p.customer_id
-                """
-                cursor.execute(query)
-
-            data = cursor.fetchall()
-            print(f"Data fetched: {data}")
-            return data
-        except Error as e:
-            print(f"Error while fetching data: {e}")
-            return []
-        finally:
-            if cursor:
+            cursor.execute("SELECT amount, customer_id FROM debts WHERE id = %s", (debt_id,))
+            debt_info = cursor.fetchone()
+            if debt_info:
+                old_amount, customer_id = debt_info
+                amount_diff = new_amount - old_amount
+                cursor.execute("UPDATE debts SET amount = %s, comment = %s, date_promised = %s WHERE id = %s",
+                               (new_amount, new_comment, new_promised_date, debt_id))
+                cursor.execute("UPDATE customers SET total = total + %s, remained = remained + %s WHERE id = %s",
+                               (amount_diff, amount_diff, customer_id))
+                self.connection.commit()
                 cursor.close()
-            self.close_connection()
+                return True
+            cursor.close()
+            return False
+        except Error as e:
+            print(f"Error updating debt entry: {e}")
+            if self.connection: self.connection.rollback()
+            return False
 
+    def update_payment_entry(self, payment_id, new_amount, new_comment):
+        if not self._reconnect(): return False
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("SELECT amount, customer_id FROM payments WHERE id = %s", (payment_id,))
+            payment_info = cursor.fetchone()
+            if payment_info:
+                old_amount, customer_id = payment_info
+                amount_diff = new_amount - old_amount
+                cursor.execute("UPDATE payments SET amount = %s, comment = %s WHERE id = %s",
+                               (new_amount, new_comment, payment_id))
+                cursor.execute("UPDATE customers SET payed = payed + %s, remained = remained - %s WHERE id = %s",
+                               (amount_diff, amount_diff, customer_id))
+                self.connection.commit()
+                cursor.close()
+                return True
+            cursor.close()
+            return False
+        except Error as e:
+            print(f"Error updating payment entry: {e}")
+            if self.connection: self.connection.rollback()
+            return False
+
+    def delete_debt_entry(self, debt_id):
+        if not self._reconnect(): return False
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("SELECT amount, customer_id FROM debts WHERE id = %s", (debt_id,))
+            debt_info = cursor.fetchone()
+            if debt_info:
+                debt_amount, customer_id = debt_info
+                cursor.execute("DELETE FROM debts WHERE id = %s", (debt_id,))
+                cursor.execute("UPDATE customers SET total = total - %s, remained = remained - %s WHERE id = %s",
+                               (debt_amount, debt_amount, customer_id))
+                self.connection.commit()
+                cursor.close()
+                return True
+            cursor.close()
+            return False
+        except Error as e:
+            print(f"Error deleting debt entry: {e}")
+            if self.connection: self.connection.rollback()
+            return False
+
+    def delete_payment_entry(self, payment_id):
+        if not self._reconnect(): return False
+        try:
+            cursor = self.connection.cursor()
+            cursor.execute("SELECT amount, customer_id FROM payments WHERE id = %s", (payment_id,))
+            payment_info = cursor.fetchone()
+            if payment_info:
+                payment_amount, customer_id = payment_info
+                cursor.execute("DELETE FROM payments WHERE id = %s", (payment_id,))
+                cursor.execute("UPDATE customers SET payed = payed - %s, remained = remained + %s WHERE id = %s",
+                               (payment_amount, payment_amount, customer_id))
+                self.connection.commit()
+                cursor.close()
+                return True
+            cursor.close()
+            return False
+        except Error as e:
+            print(f"Error deleting payment entry: {e}")
+            if self.connection: self.connection.rollback()
+            return False
