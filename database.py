@@ -10,8 +10,6 @@ class Database:
         self.password = 'SecureRoot#2025'
         self.database = 'qarz_db'
         
-        # We will try to connect, but won't exit on failure here.
-        # The main script will handle the failure.
         try:
             self.connection = mysql.connector.connect(
                 host=self.host,
@@ -22,20 +20,17 @@ class Database:
             if self.connection.is_connected():
                 print("Database connection established successfully.")
         except Error as e:
-            # If the error is "Unknown database", that's a specific case we handle.
-            if e.errno == 1049: # Error code for "Unknown database"
+            if e.errno == 1049:
                 print("Database 'qarz_db' not found. Ready for setup.")
             else:
                 print(f"FATAL: Could not connect to MySQL: {e}")
             self.connection = None
 
-    # Add this new method inside the Database class
     def create_schema(self):
         """
         Creates the database and all necessary tables.
         """
         try:
-            # First, connect to MySQL server without specifying a database
             temp_conn = mysql.connector.connect(
                 host=self.host,
                 user=self.user,
@@ -93,7 +88,6 @@ class Database:
             cursor.close()
             temp_conn.close()
             print("Database schema created successfully.")
-            # Now, establish the persistent connection
             self.connection = mysql.connector.connect(
                 host=self.host, user=self.user, password=self.password, database=self.database
             )
@@ -107,7 +101,7 @@ class Database:
         A private method to handle automatic reconnection if the connection is lost.
         """
         if self.connection and self.connection.is_connected():
-            return True # Already connected
+            return True
             
         print("Connection lost. Attempting to reconnect...")
         for i in range(attempts):
@@ -414,7 +408,6 @@ class Database:
                 ORDER BY YEAR(date_issued), MONTH(date_issued)
             """
             cursor.execute(query_loans, (start_date, end_date))
-            # This is the critical fix: (amount or 0) converts any NULL/None from the DB to 0
             stats['monthly_loans'] = {f"{year:04d}-{month:02d}": (amount or 0) for year, month, amount in cursor.fetchall()}
 
             query_payments = """
@@ -425,11 +418,9 @@ class Database:
                 ORDER BY YEAR(date_issued), MONTH(date_issued)
             """
             cursor.execute(query_payments, (start_date, end_date))
-            # This is the critical fix: (amount or 0) converts any NULL/None from the DB to 0
             stats['monthly_payments'] = {f"{year:04d}-{month:02d}": (amount or 0) for year, month, amount in cursor.fetchall()}
 
-            # Top 5 Debtors
-            # 4. Top 20 Debtors (global)
+            #Top 20 Debtors
             cursor.execute("SELECT name, remained FROM customers WHERE remained > 0 ORDER BY remained DESC LIMIT 20")
             stats['top_debtors'] = cursor.fetchall()
             

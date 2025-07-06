@@ -76,18 +76,16 @@ class BackupWorker(QObject):
             "mysqldump",
             "-h", self.db.host,
             "-u", self.db.user,
-            f"-p{self.db.password}", # Note: No space after -p
+            f"-p{self.db.password}",
             self.db.database
         ]
         try:
-            # Using subprocess.run for better error handling
             with open(backup_file, "w", encoding='utf-8') as f:
                 result = subprocess.run(command, stdout=f, stderr=subprocess.PIPE, text=True, check=False)
             
             if result.returncode != 0:
                 error_message = f"Error creating backup: {result.stderr}"
                 self.status_signal.emit(error_message)
-                print(error_message) # Also print to console for debugging
                 return None
             return backup_file
         except FileNotFoundError:
@@ -117,10 +115,8 @@ class BackupWorker(QObject):
             self.status_signal.emit(f"Error compressing backup: {str(e)}")
             return None
 
-    # --- New: Asynchronous core function for sending ---
     async def _send_telegram_async(self, backup_file):
         """The actual async part of sending the backup."""
-        # --- New: Set a longer timeout for requests ---
         httpx_request = HTTPXRequest(connect_timeout=20, read_timeout=20)
         bot = Bot(token=TELEGRAM_BOT_TOKEN, request=httpx_request)
         
@@ -158,11 +154,8 @@ class BackupWorker(QObject):
     def send_backup(self, backup_file):
         """Synchronous wrapper to run the async send operation."""
         try:
-            # asyncio.run is the modern way to run an async function from sync code.
-            # It creates and manages the event loop automatically.
             return asyncio.run(self._send_telegram_async(backup_file))
         except Exception as e:
-            # Catch any unexpected errors during the asyncio.run call
             return False, f"A general error occurred in the sending process: {e}"
 
 class BackupPage(QWidget):
@@ -240,12 +233,12 @@ class MainWindow(QMainWindow):
         self.menu_widget.setGraphicsEffect(shadow_effect)
 
         self.menu_buttons_list = []
-        # In MainWindow.__init__
+        
         self.menu_map = {
             'Qarz Qo\'shish': 0,
             'Qarzlarni ko\'rish': 1,
             'Statistika': 2,
-            'Amallar Tarixi': 3, # Renamed from "Bildirishlar"
+            'Amallar Tarixi': 3, 
             'Backup and Send': 4
         }
         
@@ -266,14 +259,14 @@ class MainWindow(QMainWindow):
         self.page_stats = StatisticsPage(self.db)
         self.page_activity_log = ActivityLogPage(self.db)
         self.page_backup = BackupPage(self.db)
-        self.page_history = History(self.content_area, self.db) # This page is not in the menu
+        self.page_history = History(self.content_area, self.db) 
 
-        self.content_area.addWidget(self.page_add)           # index 0
-        self.content_area.addWidget(self.page_list)          # index 1
-        self.content_area.addWidget(self.page_stats)         # index 2
-        self.content_area.addWidget(self.page_activity_log)  # index 3
-        self.content_area.addWidget(self.page_backup)        # index 4
-        self.content_area.addWidget(self.page_history)       # index 5 (for navigation from page_list)
+        self.content_area.addWidget(self.page_add)           
+        self.content_area.addWidget(self.page_list)          
+        self.content_area.addWidget(self.page_stats)         
+        self.content_area.addWidget(self.page_activity_log)  
+        self.content_area.addWidget(self.page_backup)        
+        self.content_area.addWidget(self.page_history)       
 
         self.main_layout.addWidget(self.menu_widget)
         self.main_layout.addWidget(self.content_area, 1)
@@ -293,7 +286,7 @@ class MainWindow(QMainWindow):
             self.content_area.setCurrentIndex(index)
             active_button_index = index
 
-        if index == 1: # If switching to the list page, refresh it
+        if index == 1:
             self.page_list.update_table()
 
         for i, btn in enumerate(self.menu_buttons_list):
@@ -313,7 +306,7 @@ class MainWindow(QMainWindow):
 def cleanup_old_files():
     """Deletes leftover .pdf, .sql, and .sql.gz files from the current directory."""
     print("Running startup cleanup...")
-    current_dir = os.getcwd() # Gets the application's folder
+    current_dir = os.getcwd()
     files_to_delete = []
     for filename in os.listdir(current_dir):
         if filename.endswith((".pdf", ".sql", ".sql.gz")):
@@ -331,7 +324,6 @@ def cleanup_old_files():
             print(f"Error deleting file {f}: {e}")
 
 
-# In Nasiya.py, replace the whole block
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)
@@ -341,7 +333,6 @@ if __name__ == '__main__':
     print("Application starting, connecting to database...")
     db_connection = Database()
 
-    # Check if the connection was successful. If not, ask to create the DB.
     if not db_connection.connection:
         reply = QMessageBox.question(
             None, 
@@ -361,7 +352,6 @@ if __name__ == '__main__':
             QMessageBox.information(None, "Exiting", "Database setup was cancelled. The application will now exit.")
             sys.exit(0)
 
-    # If we are here, the connection is successful (either initially or after creation)
     window = MainWindow(db_connection)
     window.show()
 

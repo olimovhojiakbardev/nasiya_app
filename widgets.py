@@ -516,7 +516,6 @@ class List_people(QWidget):
 
     def switch_to_history(self, customer_id):
         """Switches the view to the History page for the selected customer."""
-        # Corrected line:
         history_widget = self.stacked_widget.widget(5) 
         history_widget.update_data(customer_id)
         self.stacked_widget.setCurrentIndex(5)
@@ -549,7 +548,7 @@ class payment(QWidget):
         data = self.db.find_customer(self.customer_id)
         if not data:
             QMessageBox.critical(self, "Xato", "Mijoz topilmadi.")
-            QTimer.singleShot(0, self.close) # Close window if customer not found
+            QTimer.singleShot(0, self.close)
             return
             
         self.name_lbl = QLabel(f"{data[0]}")
@@ -611,12 +610,11 @@ class History(QWidget):
         self.db = db
         self.stacked_widget = stacked_widget
         self.customer_id = None
-        self.information = None # Cache for fetched data
+        self.information = None
         self.setup_ui()
 
     def setup_ui(self):
         """Initializes and arranges all UI elements for this page."""
-        # Use a standard icon for the back button for better compatibility
         self.back_btn = QPushButton(icon=self.style().standardIcon(QStyle.StandardPixmap.SP_ArrowLeft))
         self.back_btn.setStyleSheet("""
             QPushButton {
@@ -631,7 +629,6 @@ class History(QWidget):
         """)
 
         self.print_btn = QPushButton(" Chop etish (PDF)")
-        # Use a standard icon for a more professional look
         self.print_btn.setIcon(self.style().standardIcon(QStyle.StandardPixmap.SP_DialogSaveButton))
         self.print_btn.setStyleSheet("""
             QPushButton {
@@ -662,7 +659,6 @@ class History(QWidget):
         self.overall_lbl.setStyleSheet("font-size: 18px; color: #333333; font-weight: bold; font-family: 'Roboto'; background: #FEFAE0; padding-left: 3px")        
         self.payed_lbl.setStyleSheet("font-size: 18px; color: #00712D; font-weight: bold; font-family: 'Roboto'; background: #FEFAE0; padding-left: 3px")
 
-        # Removed fixed sizes and fixed heights for these labels.
         # Set size policy to expanding in both directions so they can fill space.
         self.debt_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         self.overall_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -817,7 +813,7 @@ class History(QWidget):
             new_contact = dialog.get_contact()
             if self.db.update_customer_contact(self.customer_id, new_contact):
                 QMessageBox.information(self, "Muvaffaqiyatli", "Mijoz raqami yangilandi.")
-                self.update_data(self.customer_id) # Refresh data
+                self.update_data(self.customer_id)
             else:
                 QMessageBox.critical(self, "Xato", "Raqamni yangilashda xatolik yuz berdi.")
 
@@ -886,12 +882,9 @@ class History(QWidget):
         doc = SimpleDocTemplate(filename, pagesize=A4)
         styles = getSampleStyleSheet()
 
-        # --- CUSTOM STYLES WITH NEW FONT ---
-        # 2. Create styles that use the new font.
         style_h1 = ParagraphStyle(name='h1_cyrillic', parent=styles['h1'], fontName='DejaVuSans')
         style_h2 = ParagraphStyle(name='h2_cyrillic', parent=styles['h2'], fontName='DejaVuSans')
         style_body = ParagraphStyle(name='body_cyrillic', parent=styles['BodyText'], fontName='DejaVuSans', alignment=1) # Centered
-        # --- END CUSTOM STYLES ---
 
         story = []
 
@@ -912,7 +905,7 @@ class History(QWidget):
         summary_table.setStyle(TableStyle([
             ('ALIGN', (0,0), (-1,-1), 'LEFT'),
             ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
-            ('FONTNAME', (0,0), (-1,-1), 'DejaVuSans'), # USE THE FONT
+            ('FONTNAME', (0,0), (-1,-1), 'DejaVuSans'),
             ('BOTTOMPADDING', (0,0), (-1,-1), 6),
             ('BACKGROUND', (0,0), (-1,-1), colors.lightgrey),
             ('GRID', (0,0), (-1,-1), 1, colors.black),
@@ -931,7 +924,7 @@ class History(QWidget):
                     Paragraph(format_number(d[1]), style_body),
                     Paragraph(d[2].strftime('%d/%m/%Y'), style_body),
                     Paragraph(d[4].strftime('%d/%m/%Y') if d[4] else "N/A", style_body),
-                    Paragraph(d[3], style_body) # Wrap comment in Paragraph
+                    Paragraph(d[3], style_body)
                 ] for d in self.information['debts']
             ]
 
@@ -939,7 +932,7 @@ class History(QWidget):
             debt_table.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#C7253E')),
                 ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-                ('FONTNAME', (0,0), (-1,-1), 'DejaVuSans'), # USE THE FONT
+                ('FONTNAME', (0,0), (-1,-1), 'DejaVuSans'),
                 ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
                 ('BOTTOMPADDING', (0,0), (-1,0), 12),
                 ('BACKGROUND', (0,1), (-1,-1), colors.white),
@@ -958,7 +951,7 @@ class History(QWidget):
                 [
                     Paragraph(format_number(p[1]), style_body),
                     Paragraph(p[2].strftime('%d/%m/%Y %H:%M'), style_body),
-                    Paragraph(p[3], style_body) # Wrap comment in Paragraph
+                    Paragraph(p[3], style_body)
                 ] for p in self.information['payments']
             ]
 
@@ -966,7 +959,7 @@ class History(QWidget):
             payment_table.setStyle(TableStyle([
                 ('BACKGROUND', (0,0), (-1,0), colors.HexColor('#00712D')),
                 ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
-                ('FONTNAME', (0,0), (-1,-1), 'DejaVuSans'), # USE THE FONT
+                ('FONTNAME', (0,0), (-1,-1), 'DejaVuSans'),
                 ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
                 ('BOTTOMPADDING', (0,0), (-1,0), 12),
                 ('BACKGROUND', (0,1), (-1,-1), colors.white),
@@ -994,11 +987,6 @@ class History(QWidget):
         self.stacked_widget.setCurrentIndex(1)
 
 
-# In widgets.py, add this import at the top
-import pyqtgraph as pg
-from pandas import date_range # We'll use pandas for easy date handling
-
-# ... add this entire new class to the end of widgets.py
 class StatisticsPage(QWidget):
     """The main page for viewing statistics with charts and KPIs."""
     def __init__(self, db):
@@ -1007,7 +995,7 @@ class StatisticsPage(QWidget):
         self.main_layout = QVBoxLayout(self)
         self.setup_ui()
         self.set_default_dates()
-        QTimer.singleShot(50, self.update_dashboard) # Update dashboard shortly after UI is shown
+        QTimer.singleShot(50, self.update_dashboard)
 
     def setup_ui(self):
         # --- Filter Layout ---
@@ -1035,11 +1023,11 @@ class StatisticsPage(QWidget):
         self.kpi_outstanding = self.create_kpi_card("Umumiy Qoldiq", "0 so'm", "#A93226")
         self.kpi_loaned = self.create_kpi_card("Davr Ichida Berildi", "0 so'm", "#2E86C1")
         self.kpi_recovered = self.create_kpi_card("Davr Ichida Olindi", "0 so'm", "#28B463")
-        self.kpi_net_change = self.create_kpi_card("Davrdagi O'zgarish", "0 so'm", "#F39C12") # New Card
+        self.kpi_net_change = self.create_kpi_card("Davrdagi O'zgarish", "0 so'm", "#F39C12")
         kpi_layout.addWidget(self.kpi_outstanding)
         kpi_layout.addWidget(self.kpi_loaned)
         kpi_layout.addWidget(self.kpi_recovered)
-        kpi_layout.addWidget(self.kpi_net_change) # Add new card to layout
+        kpi_layout.addWidget(self.kpi_net_change)
         
         # --- Charts Layout ---
         charts_layout = QHBoxLayout()
@@ -1068,16 +1056,13 @@ class StatisticsPage(QWidget):
         self.top_debtors_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.top_debtors_table.setStyleSheet("font-size: 14pt;")
 
-        # Pie chart for overdue debts
-        # pyqtgraph doesn't have a built-in pie chart, we will represent it with a simple label for now.
-        # This can be replaced with a proper pie chart widget later if needed.
         self.overdue_card = self.create_kpi_card("Vaqti O'tgan Qarzlar", "N/A", "#E67E22")
 
         bottom_charts_layout.addWidget(self.top_debtors_table)
         bottom_charts_layout.addWidget(self.overdue_card)
         
-        charts_layout.addWidget(self.activity_chart, 3) # Takes 3/4 of the space
-        charts_layout.addLayout(bottom_charts_layout, 1) # Takes 1/4 of the space
+        charts_layout.addWidget(self.activity_chart, 3)
+        charts_layout.addLayout(bottom_charts_layout, 1)
 
         # --- Add layouts to main layout ---
         self.main_layout.addLayout(filter_layout)
@@ -1105,7 +1090,7 @@ class StatisticsPage(QWidget):
         card_layout.addWidget(title_lbl)
         card_layout.addWidget(value_lbl)
         
-        card.value_label = value_lbl # Attach label for easy updating
+        card.value_label = value_lbl
         return card
         
     def set_default_dates(self):
@@ -1166,7 +1151,6 @@ class StatisticsPage(QWidget):
             name_item = QTableWidgetItem(name)
             amount_item = QTableWidgetItem(f"{format_number(amount)} so'm")
             
-            # Align text for better readability
             amount_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             
             self.top_debtors_table.setItem(row_num, 0, name_item)
@@ -1174,9 +1158,8 @@ class StatisticsPage(QWidget):
         
         # Update Monthly Activity Chart
         self.activity_chart.clear()
-        self.activity_chart.addLegend() # Re-add legend after clearing
+        self.activity_chart.addLegend()
         
-        # Generate a complete list of months in the range for the x-axis
         months = [dt.strftime("%Y-%m") for dt in date_range(start_date, end_date, freq='MS')]
         x_axis_labels = [datetime.strptime(m, "%Y-%m").strftime("%b %y") for m in months]
         x_dict = dict(enumerate(x_axis_labels))
@@ -1218,7 +1201,7 @@ class ActivityLogPage(QWidget):
         filter_layout.addWidget(QLabel("To:"))
         filter_layout.addWidget(self.to_date_edit)
         filter_layout.addWidget(self.action_type_combo)
-        filter_layout.addWidget(self.customer_search_edit, 1) # Give search box more space
+        filter_layout.addWidget(self.customer_search_edit, 1)
         filter_layout.addWidget(self.apply_btn)
 
         # --- Results Table ---
@@ -1283,10 +1266,10 @@ class ActivityLogPage(QWidget):
 
             if action == 'qarz':
                 action_item = QTableWidgetItem("Qarz qo'shildi")
-                amount_item.setForeground(QColor("#C7253E")) # Red for debts
+                amount_item.setForeground(QColor("#C7253E"))
             else: # payment
                 action_item = QTableWidgetItem("To'lov qilindi")
-                amount_item.setForeground(QColor("#00712D")) # Green for payments
+                amount_item.setForeground(QColor("#00712D"))
                 
             amount_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             
