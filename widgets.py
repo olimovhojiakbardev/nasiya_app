@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (QLineEdit, QLabel, QVBoxLayout, QWidget, QDialog,
                              QTableWidget, QHBoxLayout, QPushButton, QGraphicsDropShadowEffect,
                              QTableWidgetItem, QHeaderView, QMessageBox,
-                             QFormLayout, QSizePolicy, QMenu, QDateEdit, QStyle)
+                             QFormLayout, QSizePolicy, QMenu, QDateEdit, QStyle, QComboBox)
 from PyQt6.QtCore import Qt, QSize, QDate, QTimer
 from PyQt6.QtGui import QColor, QIcon
 from datetime import datetime
@@ -16,14 +16,25 @@ from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.styles import ParagraphStyle
+import tempfile
+import pyqtgraph as pg
+from pandas import date_range
 
-# Helper function for formatting numbers with spaces
 def format_number(num):
     """Formats a number into a string with spaces as thousands separators."""
     try:
         return f"{int(num):,}".replace(",", " ")
     except (ValueError, TypeError):
         return "0"
+
+date_style = """
+    QDateEdit {
+        font-size: 14pt;
+        padding: 8px;
+        border: 1px solid #B0B0B0;
+        border-radius: 8px;
+    }
+"""
 
 class EditContactDialog(QDialog):
     """A dialog for editing a customer's contact number."""
@@ -82,6 +93,7 @@ class EditDeleteDialog(QDialog):
         self.date_edit = None
         if self.entry_type == 'debt':
             self.date_edit = QDateEdit()
+            self.date_edit.setStyleSheet(date_style)
             self.date_edit.setCalendarPopup(True)
             self.date_edit.setDisplayFormat("dd/MM/yyyy")
             if current_date_str:
@@ -856,20 +868,20 @@ class History(QWidget):
             QMessageBox.warning(self, "Xato", "Mijoz ma'lumotlari mavjud emas.")
             return
 
-        # --- FONT REGISTRATION ---
-        # 1. Check for the font file and register it.
         font_path = "DejaVuSans.ttf" 
         if not os.path.exists(font_path):
             QMessageBox.critical(self, "Xatolik", f"Font fayli topilmadi: {font_path}. Iltimos, shrift faylini dastur papkasiga joylashtiring.")
             return
         pdfmetrics.registerFont(TTFont('DejaVuSans', font_path))
-        # --- END FONT REGISTRATION ---
 
         person_data = self.information['person']
         customer_name = person_data['name']
 
+        temp_dir = tempfile.gettempdir() 
+
         safe_customer_name = "".join(c for c in customer_name if c.isalnum())
-        filename = f"Mijoz_Tarixi_{safe_customer_name}.pdf"
+
+        filename = os.path.join(temp_dir, f"Mijoz_Tarixi_{safe_customer_name}.pdf")
 
         doc = SimpleDocTemplate(filename, pagesize=A4)
         styles = getSampleStyleSheet()
@@ -974,8 +986,314 @@ class History(QWidget):
 
         except Exception as e:
             QMessageBox.critical(self, "Xato", f"PDF faylni yaratishda xato yuz berdi:\n{e}")
+    
     def back_to_list(self):
         """Switches the view back to the main customer list."""
         list_people_widget = self.stacked_widget.widget(1)
         list_people_widget.update_table()
         self.stacked_widget.setCurrentIndex(1)
+
+
+# In widgets.py, add this import at the top
+import pyqtgraph as pg
+from pandas import date_range # We'll use pandas for easy date handling
+
+# ... add this entire new class to the end of widgets.py
+class StatisticsPage(QWidget):
+    """The main page for viewing statistics with charts and KPIs."""
+    def __init__(self, db):
+        super().__init__()
+        self.db = db
+        self.main_layout = QVBoxLayout(self)
+        self.setup_ui()
+        self.set_default_dates()
+        QTimer.singleShot(50, self.update_dashboard) # Update dashboard shortly after UI is shown
+
+    def setup_ui(self):
+        # --- Filter Layout ---
+        filter_layout = QHBoxLayout()
+        self.from_date_edit = QDateEdit(calendarPopup=True)
+        self.to_date_edit = QDateEdit(calendarPopup=True)
+        self.from_date_edit.setStyleSheet(date_style)
+        self.to_date_edit.setStyleSheet(date_style) 
+        self.apply_btn = QPushButton("Filter")
+        
+        self.this_month_btn = QPushButton("This Month")
+        self.this_year_btn = QPushButton("This Year")
+
+        filter_layout.addWidget(QLabel("From:"))
+        filter_layout.addWidget(self.from_date_edit)
+        filter_layout.addWidget(QLabel("To:"))
+        filter_layout.addWidget(self.to_date_edit)
+        filter_layout.addWidget(self.apply_btn)
+        filter_layout.addStretch()
+        filter_layout.addWidget(self.this_month_btn)
+        filter_layout.addWidget(self.this_year_btn)
+
+        # --- KPI Layout ---
+        kpi_layout = QHBoxLayout()
+        self.kpi_outstanding = self.create_kpi_card("Umumiy Qoldiq", "0 so'm", "#A93226")
+        self.kpi_loaned = self.create_kpi_card("Davr Ichida Berildi", "0 so'm", "#2E86C1")
+        self.kpi_recovered = self.create_kpi_card("Davr Ichida Olindi", "0 so'm", "#28B463")
+        self.kpi_net_change = self.create_kpi_card("Davrdagi O'zgarish", "0 so'm", "#F39C12") # New Card
+        kpi_layout.addWidget(self.kpi_outstanding)
+        kpi_layout.addWidget(self.kpi_loaned)
+        kpi_layout.addWidget(self.kpi_recovered)
+        kpi_layout.addWidget(self.kpi_net_change) # Add new card to layout
+        
+        # --- Charts Layout ---
+        charts_layout = QHBoxLayout()
+        
+        # Main line chart for monthly activity
+        self.activity_chart = pg.PlotWidget()
+        self.activity_chart.setBackground('w')
+        self.activity_chart.setTitle("Oylik Harakat (Berilgan vs Olingan)", color="k", size="16pt")
+        self.activity_chart.addLegend()
+        self.activity_chart.setLabel('left', 'Summa (so\'m)', color='k')
+        self.activity_chart.setLabel('bottom', 'Oy', color='k')
+        self.activity_chart.showGrid(x=True, y=True)
+        
+        bottom_charts_layout = QVBoxLayout()
+        
+        top_debtors_title = QLabel("Top 20 Qarzdorlar")
+        top_debtors_title.setStyleSheet("font-size: 16pt; font-weight: bold; color: 'k';")
+        top_debtors_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        bottom_charts_layout.addWidget(top_debtors_title)
+
+        # Table for top debtors
+        self.top_debtors_table = QTableWidget()
+        self.top_debtors_table.setColumnCount(2)
+        self.top_debtors_table.setHorizontalHeaderLabels(["Ism", "Qoldiq Qarz"])
+        self.top_debtors_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.top_debtors_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.top_debtors_table.setStyleSheet("font-size: 14pt;")
+
+        # Pie chart for overdue debts
+        # pyqtgraph doesn't have a built-in pie chart, we will represent it with a simple label for now.
+        # This can be replaced with a proper pie chart widget later if needed.
+        self.overdue_card = self.create_kpi_card("Vaqti O'tgan Qarzlar", "N/A", "#E67E22")
+
+        bottom_charts_layout.addWidget(self.top_debtors_table)
+        bottom_charts_layout.addWidget(self.overdue_card)
+        
+        charts_layout.addWidget(self.activity_chart, 3) # Takes 3/4 of the space
+        charts_layout.addLayout(bottom_charts_layout, 1) # Takes 1/4 of the space
+
+        # --- Add layouts to main layout ---
+        self.main_layout.addLayout(filter_layout)
+        self.main_layout.addLayout(kpi_layout)
+        self.main_layout.addLayout(charts_layout)
+        
+        # --- Connections ---
+        self.apply_btn.clicked.connect(self.update_dashboard)
+        self.this_month_btn.clicked.connect(self.set_this_month)
+        self.this_year_btn.clicked.connect(self.set_this_year)
+
+    def create_kpi_card(self, title, value, color):
+        card = QWidget()
+        card_layout = QVBoxLayout(card)
+        card.setStyleSheet(f"background-color: {color}; border-radius: 10px; color: white;")
+        
+        title_lbl = QLabel(title)
+        title_lbl.setStyleSheet("font-size: 14pt; font-weight: bold;")
+        title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        value_lbl = QLabel(value)
+        value_lbl.setStyleSheet("font-size: 18pt;")
+        value_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        card_layout.addWidget(title_lbl)
+        card_layout.addWidget(value_lbl)
+        
+        card.value_label = value_lbl # Attach label for easy updating
+        return card
+        
+    def set_default_dates(self):
+        today = QDate.currentDate()
+        start_of_year = QDate(today.year(), 1, 1)
+        self.from_date_edit.setDate(start_of_year)
+        self.to_date_edit.setDate(today)
+
+    def set_this_month(self):
+        today = QDate.currentDate()
+        start_of_month = QDate(today.year(), today.month(), 1)
+        self.from_date_edit.setDate(start_of_month)
+        self.to_date_edit.setDate(today)
+        self.update_dashboard()
+
+    def set_this_year(self):
+        self.set_default_dates()
+        self.update_dashboard()
+
+    def update_dashboard(self):
+        start_date = self.from_date_edit.date().toString("yyyy-MM-dd")
+        end_date = self.to_date_edit.date().toString("yyyy-MM-dd")
+        
+        stats = self.db.get_statistics(start_date, end_date)
+        
+        if not stats:
+            QMessageBox.critical(self, "Xato", "Statistika ma'lumotlarini yuklab bo'lmadi.")
+            return
+            
+        # Update KPIs
+        self.kpi_outstanding.value_label.setText(f"{format_number(stats['total_outstanding_debt'])} so'm")
+        self.kpi_loaned.value_label.setText(f"{format_number(stats['total_loaned_period'])} so'm")
+        self.kpi_recovered.value_label.setText(f"{format_number(stats['total_recovered_period'])} so'm")
+
+        # Calculate and display Net Change for the period
+        net_change = stats['total_recovered_period'] - stats['total_loaned_period']
+        self.kpi_net_change.value_label.setText(f"{format_number(net_change)} so'm")
+
+        # Change color of Net Change card based on value
+        if net_change >= 0:
+            self.kpi_net_change.setStyleSheet("background-color: #28B463; border-radius: 10px; color: white;") # Green for positive
+        else:
+            self.kpi_net_change.setStyleSheet("background-color: #E74C3C; border-radius: 10px; color: white;") # Red for negative
+            if stats['active_debts_count'] > 0:
+                overdue_percent = (stats['overdue_debts_count'] / stats['active_debts_count']) * 100
+                self.overdue_card.value_label.setText(f"{stats['overdue_debts_count']} ({overdue_percent:.1f}%)")
+            else:
+                self.overdue_card.value_label.setText("0 (0%)")
+
+        # Update Top Debtors Table
+        top_debtors = stats.get('top_debtors', [])
+        self.top_debtors_table.setRowCount(len(top_debtors))
+
+        for row_num, debtor_data in enumerate(top_debtors):
+            name = debtor_data[0]
+            amount = debtor_data[1]
+            
+            name_item = QTableWidgetItem(name)
+            amount_item = QTableWidgetItem(f"{format_number(amount)} so'm")
+            
+            # Align text for better readability
+            amount_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            
+            self.top_debtors_table.setItem(row_num, 0, name_item)
+            self.top_debtors_table.setItem(row_num, 1, amount_item)
+        
+        # Update Monthly Activity Chart
+        self.activity_chart.clear()
+        self.activity_chart.addLegend() # Re-add legend after clearing
+        
+        # Generate a complete list of months in the range for the x-axis
+        months = [dt.strftime("%Y-%m") for dt in date_range(start_date, end_date, freq='MS')]
+        x_axis_labels = [datetime.strptime(m, "%Y-%m").strftime("%b %y") for m in months]
+        x_dict = dict(enumerate(x_axis_labels))
+        
+        loans_data = [int(stats['monthly_loans'].get(m, 0) or 0) for m in months]
+        payments_data = [int(stats['monthly_payments'].get(m, 0) or 0) for m in months]        
+        self.activity_chart.plot(list(x_dict.keys()), loans_data, pen=pg.mkPen('r', width=2), name="Berilgan Qarz")
+        self.activity_chart.plot(list(x_dict.keys()), payments_data, pen=pg.mkPen('g', width=2), name="Olingan To'lov")
+        self.activity_chart.getAxis('bottom').setTicks([x_dict.items()])
+
+class ActivityLogPage(QWidget):
+    """A page to view and filter all historical transactions."""
+    def __init__(self, db):
+        super().__init__()
+        self.db = db
+        self.main_layout = QVBoxLayout(self)
+        self.setup_ui()
+        self.set_default_dates()
+        QTimer.singleShot(50, self.update_log_view)
+
+    def setup_ui(self):
+        # --- Filter Layout ---
+        filter_layout = QHBoxLayout()
+        self.from_date_edit = QDateEdit(calendarPopup=True)
+        self.to_date_edit = QDateEdit(calendarPopup=True)
+        self.from_date_edit.setStyleSheet(date_style)
+        self.to_date_edit.setStyleSheet(date_style)  
+        
+        self.action_type_combo = QComboBox()
+        self.action_type_combo.addItems(["Barcha Amallar", "Qarzlar", "To'lovlar"])
+        
+        self.customer_search_edit = QLineEdit()
+        self.customer_search_edit.setPlaceholderText("Mijoz bo'yicha qidirish...")
+        
+        self.apply_btn = QPushButton("Filter")
+        
+        filter_layout.addWidget(QLabel("From:"))
+        filter_layout.addWidget(self.from_date_edit)
+        filter_layout.addWidget(QLabel("To:"))
+        filter_layout.addWidget(self.to_date_edit)
+        filter_layout.addWidget(self.action_type_combo)
+        filter_layout.addWidget(self.customer_search_edit, 1) # Give search box more space
+        filter_layout.addWidget(self.apply_btn)
+
+        # --- Results Table ---
+        self.activity_table = QTableWidget()
+        self.activity_table.setColumnCount(5)
+        self.activity_table.setHorizontalHeaderLabels(["Sana", "Mijoz", "Amal", "Summa", "Izoh"])
+        self.activity_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.activity_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        self.activity_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self.activity_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        self.activity_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        self.activity_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        
+        # --- Summary Layout ---
+        summary_layout = QHBoxLayout()
+        self.total_transactions_lbl = QLabel("Jami amallar: 0")
+        summary_layout.addStretch()
+        summary_layout.addWidget(self.total_transactions_lbl)
+
+        # --- Add layouts to main layout ---
+        self.main_layout.addLayout(filter_layout)
+        self.main_layout.addWidget(self.activity_table)
+        self.main_layout.addLayout(summary_layout)
+        
+        # --- Connections ---
+        self.apply_btn.clicked.connect(self.update_log_view)
+        self.customer_search_edit.returnPressed.connect(self.update_log_view)
+
+    def set_default_dates(self):
+        today = QDate.currentDate()
+        start_of_month = QDate(today.year(), today.month(), 1)
+        self.from_date_edit.setDate(start_of_month)
+        self.to_date_edit.setDate(today)
+
+    def update_log_view(self):
+        start_date = self.from_date_edit.date().toString("yyyy-MM-dd")
+        end_date = self.to_date_edit.date().toString("yyyy-MM-dd")
+        customer_name = self.customer_search_edit.text()
+        
+        action_map = {
+            "Barcha Amallar": 'all',
+            "Qarzlar": 'qarz',
+            "To'lovlar": 'tolov'
+        }
+        action_type = action_map[self.action_type_combo.currentText()]
+        
+        log_data = self.db.get_activity_log(start_date, end_date, action_type, customer_name)
+        
+        if log_data is None:
+            QMessageBox.critical(self, "Xato", "Tarix ma'lumotlarini yuklab bo'lmadi.")
+            return
+
+        self.activity_table.setRowCount(len(log_data))
+
+        for row_num, row_data in enumerate(log_data):
+            date, customer, amount, action, comment = row_data
+            
+            date_item = QTableWidgetItem(date.strftime('%Y-%m-%d %H:%M'))
+            customer_item = QTableWidgetItem(customer)
+            amount_item = QTableWidgetItem(format_number(amount))
+            comment_item = QTableWidgetItem(comment)
+
+            if action == 'qarz':
+                action_item = QTableWidgetItem("Qarz qo'shildi")
+                amount_item.setForeground(QColor("#C7253E")) # Red for debts
+            else: # payment
+                action_item = QTableWidgetItem("To'lov qilindi")
+                amount_item.setForeground(QColor("#00712D")) # Green for payments
+                
+            amount_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            
+            self.activity_table.setItem(row_num, 0, date_item)
+            self.activity_table.setItem(row_num, 1, customer_item)
+            self.activity_table.setItem(row_num, 2, action_item)
+            self.activity_table.setItem(row_num, 3, amount_item)
+            self.activity_table.setItem(row_num, 4, comment_item)
+            
+        self.total_transactions_lbl.setText(f"Jami amallar: {len(log_data)}")

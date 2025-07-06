@@ -303,3 +303,123 @@ class Database:
             print(f"Error deleting payment entry: {e}")
             if self.connection: self.connection.rollback()
             return False
+        
+
+    def get_statistics(self, start_date, end_date):
+        """
+        Fetches all necessary statistics for the dashboard.
+        start_date and end_date should be in 'YYYY-MM-DD' format.
+        """
+        if not self._reconnect(): return None
+        
+        stats = {}
+        try:
+            cursor = self.connection.cursor()
+
+            # Global KPIs (not dependent on date)
+            cursor.execute("SELECT SUM(remained), COUNT(*) FROM customers WHERE remained > 0")
+            total_remained, active_debtors = cursor.fetchone()
+            stats['total_outstanding_debt'] = total_remained or 0
+            stats['active_debtors'] = active_debtors or 0
+
+            # Date-filtered KPIs
+            cursor.execute("SELECT SUM(amount) FROM debts WHERE DATE(date_issued) BETWEEN %s AND %s", (start_date, end_date))
+            stats['total_loaned_period'] = cursor.fetchone()[0] or 0
+            
+            cursor.execute("SELECT SUM(amount) FROM payments WHERE DATE(date_issued) BETWEEN %s AND %s", (start_date, end_date))
+            stats['total_recovered_period'] = cursor.fetchone()[0] or 0
+
+            # Monthly activity for the line chart
+            query_loans = """
+                SELECT YEAR(date_issued), MONTH(date_issued), SUM(amount)
+                FROM debts
+                WHERE DATE(date_issued) BETWEEN %s AND %s
+                GROUP BY YEAR(date_issued), MONTH(date_issued)
+                ORDER BY YEAR(date_issued), MONTH(date_issued)
+            """
+            cursor.execute(query_loans, (start_date, end_date))
+            # This is the critical fix: (amount or 0) converts any NULL/None from the DB to 0
+            stats['monthly_loans'] = {f"{year:04d}-{month:02d}": (amount or 0) for year, month, amount in cursor.fetchall()}
+
+            query_payments = """
+                SELECT YEAR(date_issued), MONTH(date_issued), SUM(amount)
+                FROM payments
+                WHERE DATE(date_issued) BETWEEN %s AND %s
+                GROUP BY YEAR(date_issued), MONTH(date_issued)
+                ORDER BY YEAR(date_issued), MONTH(date_issued)
+            """
+            cursor.execute(query_payments, (start_date, end_date))
+            # This is the critical fix: (amount or 0) converts any NULL/None from the DB to 0
+            stats['monthly_payments'] = {f"{year:04d}-{month:02d}": (amount or 0) for year, month, amount in cursor.fetchall()}
+
+            # Top 5 Debtors
+            # 4. Top 20 Debtors (global)
+            cursor.execute("SELECT name, remained FROM customers WHERE remained > 0 ORDER BY remained DESC LIMIT 20")
+            stats['top_debtors'] = cursor.fetchall()
+            
+            # Overdue Debts
+            cursor.execute("""
+                SELECT COUNT(*) FROM debts d
+                JOIN customers c ON d.customer_id = c.id
+                WHERE d.date_promised < CURDATE() AND c.remained > 0
+            """)
+            stats['overdue_debts_count'] = cursor.fetchone()[0] or 0
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM debts d
+                JOIN customers c ON d.customer_id = c.id
+                WHERE c.remained > 0
+            """)
+            stats['active_debts_count'] = cursor.fetchone()[0] or 0
+
+            cursor.close()
+            return stats
+        except Exception as e:
+            print(f"Error getting statistics: {e}")
+            return None
+        
+    def get_activity_log(self, start_date, end_date, action_type, customer_name):
+        """
+        Fetches a combined log of debts and payments for the activity page.
+        - action_type can be 'all', 'debts', or 'payments'.
+        - customer_name is a string for searching.
+        """
+        if not self._reconnect(): return None
+        
+        try:
+            cursor = self.connection.cursor()
+            
+            base_query = """
+                SELECT date_issued, customer_id, amount, 'qarz' as type, comment FROM debts
+                UNION ALL
+                SELECT date_issued, customer_id, amount, 'tolov' as type, comment FROM payments
+            """
+            
+            query = f"""
+                SELECT a.date_issued, c.name, a.amount, a.type, a.comment
+                FROM ({base_query}) AS a
+                JOIN customers c ON a.customer_id = c.id
+                WHERE DATE(a.date_issued) BETWEEN %s AND %s
+            """
+            
+            params = [start_date, end_date]
+            
+            if action_type != 'all':
+                query += " AND a.type = %s"
+                params.append(action_type.rstrip('s')) # 'debts' -> 'debt', 'payments' -> 'payment'
+            
+            if customer_name:
+                query += " AND c.name LIKE %s"
+                params.append(f"%{customer_name}%")
+                
+            query += " ORDER BY a.date_issued DESC"
+            
+            cursor.execute(query, tuple(params))
+            
+            results = cursor.fetchall()
+            cursor.close()
+            return results
+
+        except Exception as e:
+            print(f"Error getting activity log: {e}")
+            return None

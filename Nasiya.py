@@ -2,11 +2,9 @@ from PyQt6.QtWidgets import (QMainWindow, QHBoxLayout, QVBoxLayout, QWidget, QGr
                              QPushButton, QStackedWidget, QLabel, QSizePolicy, QApplication, QMessageBox)
 from PyQt6.QtGui import QColor
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QObject
-# Assuming widgets.py contains your custom page widgets like Add_page, List_people, History
-# If not, you might need to replace these with standard QWidget placeholders for testing.
-from widgets import Add_page, List_people, History 
+# In Nasiya.py
+from widgets import Add_page, List_people, History, StatisticsPage, ActivityLogPage
 from database import Database
-# --- New: Import from config.py ---
 from config import TELEGRAM_BOT_TOKEN, TELEGRAM_USER_IDS
 import sys
 import requests
@@ -18,7 +16,6 @@ import asyncio
 from datetime import datetime
 from telegram import Bot
 from telegram.error import TelegramError
-# --- New: Import for custom request timeout ---
 from telegram.request import HTTPXRequest
 
 class BackupWorker(QObject):
@@ -243,13 +240,13 @@ class MainWindow(QMainWindow):
         self.menu_widget.setGraphicsEffect(shadow_effect)
 
         self.menu_buttons_list = []
-        # Adjusted page mapping
+        # In MainWindow.__init__
         self.menu_map = {
             'Qarz Qo\'shish': 0,
             'Qarzlarni ko\'rish': 1,
             'Statistika': 2,
-            'Bildirishlar': 3,
-            'Backup and Send': 4 # New index for the backup page
+            'Amallar Tarixi': 3, # Renamed from "Bildirishlar"
+            'Backup and Send': 4
         }
         
         for button_name, page_index in self.menu_map.items():
@@ -266,15 +263,15 @@ class MainWindow(QMainWindow):
         # Page indices must match the menu_map
         self.page_add = Add_page(self.db)
         self.page_list = List_people(self.content_area, self.db)
-        self.page_stats = QLabel("Statistika разрабатывается")
-        self.page_notifications = QLabel("Bildirishlar разрабатывается")
+        self.page_stats = StatisticsPage(self.db)
+        self.page_activity_log = ActivityLogPage(self.db)
         self.page_backup = BackupPage(self.db)
         self.page_history = History(self.content_area, self.db) # This page is not in the menu
 
         self.content_area.addWidget(self.page_add)           # index 0
         self.content_area.addWidget(self.page_list)          # index 1
         self.content_area.addWidget(self.page_stats)         # index 2
-        self.content_area.addWidget(self.page_notifications) # index 3
+        self.content_area.addWidget(self.page_activity_log)  # index 3
         self.content_area.addWidget(self.page_backup)        # index 4
         self.content_area.addWidget(self.page_history)       # index 5 (for navigation from page_list)
 
@@ -313,10 +310,32 @@ class MainWindow(QMainWindow):
                 QPushButton:hover { background-color: #CCD3CA; border: 0; color: #151515; }
                 """)
 
+def cleanup_old_files():
+    """Deletes leftover .pdf, .sql, and .sql.gz files from the current directory."""
+    print("Running startup cleanup...")
+    current_dir = os.getcwd() # Gets the application's folder
+    files_to_delete = []
+    for filename in os.listdir(current_dir):
+        if filename.endswith((".pdf", ".sql", ".sql.gz")):
+            files_to_delete.append(filename)
+
+    if not files_to_delete:
+        print("No old files to clean up.")
+        return
+
+    for f in files_to_delete:
+        try:
+            os.remove(os.path.join(current_dir, f))
+            print(f"Deleted old file: {f}")
+        except OSError as e:
+            print(f"Error deleting file {f}: {e}")
+
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
-    print("Application starting, connecting to database...")
+    cleanup_old_files()
+    
     db_connection = Database()
 
     if not db_connection.connection:
