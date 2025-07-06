@@ -4,16 +4,14 @@ import time
 
 class Database:
     def __init__(self):
-        """
-        The constructor now immediately tries to establish a
-        persistent connection.
-        """
         self.connection = None
-        # --- Corrected: Removed trailing commas ---
         self.host = 'localhost'
         self.user = 'root'
         self.password = 'SecureRoot#2025'
         self.database = 'qarz_db'
+        
+        # We will try to connect, but won't exit on failure here.
+        # The main script will handle the failure.
         try:
             self.connection = mysql.connector.connect(
                 host=self.host,
@@ -21,10 +19,88 @@ class Database:
                 password=self.password,
                 database=self.database
             )
-            print("Database connection established successfully.")
+            if self.connection.is_connected():
+                print("Database connection established successfully.")
         except Error as e:
-            print(f"FATAL: Could not connect to MySQL: {e}")
+            # If the error is "Unknown database", that's a specific case we handle.
+            if e.errno == 1049: # Error code for "Unknown database"
+                print("Database 'qarz_db' not found. Ready for setup.")
+            else:
+                print(f"FATAL: Could not connect to MySQL: {e}")
             self.connection = None
+
+    # Add this new method inside the Database class
+    def create_schema(self):
+        """
+        Creates the database and all necessary tables.
+        """
+        try:
+            # First, connect to MySQL server without specifying a database
+            temp_conn = mysql.connector.connect(
+                host=self.host,
+                user=self.user,
+                password=self.password
+            )
+            cursor = temp_conn.cursor()
+            
+            print("Creating database 'qarz_db'...")
+            cursor.execute("CREATE DATABASE IF NOT EXISTS qarz_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+            cursor.execute("USE qarz_db")
+            
+            print("Creating table 'customers'...")
+            cursor.execute("""
+            CREATE TABLE `customers` (
+            `id` int NOT NULL AUTO_INCREMENT,
+            `name` varchar(255) NOT NULL,
+            `contact` varchar(20) DEFAULT NULL,
+            `total` bigint DEFAULT 0,
+            `payed` bigint DEFAULT 0,
+            `remained` bigint DEFAULT 0,
+            PRIMARY KEY (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            """)
+            
+            print("Creating table 'debts'...")
+            cursor.execute("""
+            CREATE TABLE `debts` (
+            `id` int NOT NULL AUTO_INCREMENT,
+            `customer_id` int DEFAULT NULL,
+            `amount` bigint DEFAULT NULL,
+            `date_issued` datetime DEFAULT NULL,
+            `date_promised` date DEFAULT NULL,
+            `comment` text,
+            PRIMARY KEY (`id`),
+            KEY `customer_id` (`customer_id`),
+            CONSTRAINT `debts_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            """)
+            
+            print("Creating table 'payments'...")
+            cursor.execute("""
+            CREATE TABLE `payments` (
+            `id` int NOT NULL AUTO_INCREMENT,
+            `customer_id` int DEFAULT NULL,
+            `amount` bigint DEFAULT NULL,
+            `date_issued` datetime DEFAULT NULL,
+            `comment` text,
+            PRIMARY KEY (`id`),
+            KEY `customer_id` (`customer_id`),
+            CONSTRAINT `payments_ibfk_1` FOREIGN KEY (`customer_id`) REFERENCES `customers` (`id`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+            """)
+
+            temp_conn.commit()
+            cursor.close()
+            temp_conn.close()
+            print("Database schema created successfully.")
+            # Now, establish the persistent connection
+            self.connection = mysql.connector.connect(
+                host=self.host, user=self.user, password=self.password, database=self.database
+            )
+            return True
+        except Error as e:
+            print(f"FATAL: Failed to create database schema: {e}")
+            return False
 
     def _reconnect(self, attempts=3, delay=2):
         """

@@ -331,18 +331,37 @@ def cleanup_old_files():
             print(f"Error deleting file {f}: {e}")
 
 
+# In Nasiya.py, replace the whole block
+
 if __name__ == '__main__':
     app = QApplication(sys.argv)
 
     cleanup_old_files()
     
+    print("Application starting, connecting to database...")
     db_connection = Database()
 
+    # Check if the connection was successful. If not, ask to create the DB.
     if not db_connection.connection:
-        QMessageBox.critical(None, "Database Error", 
-                             "Could not connect to the database. The application will now exit.")
-        sys.exit(1)
+        reply = QMessageBox.question(
+            None, 
+            "Database Not Found",
+            "The database 'qarz_db' was not found.\n\n"
+            "Would you like to create it now? (Requires MySQL to be running).",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.Yes
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            if not db_connection.create_schema():
+                QMessageBox.critical(None, "Database Error", 
+                                     "Failed to create the database. Please check your MySQL server and permissions. The application will now exit.")
+                sys.exit(1)
+        else:
+            QMessageBox.information(None, "Exiting", "Database setup was cancelled. The application will now exit.")
+            sys.exit(0)
 
+    # If we are here, the connection is successful (either initially or after creation)
     window = MainWindow(db_connection)
     window.show()
 
